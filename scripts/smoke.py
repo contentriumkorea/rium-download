@@ -9,6 +9,13 @@ b=json.dumps({'type':'ping'}).encode()
 out,_=proc.communicate(struct.pack('<I',len(b))+b,timeout=30)
 assert proc.returncode==0 and len(out)>=4
 n=struct.unpack('<I',out[:4])[0];assert json.loads(out[4:4+n])=={'type':'pong','version':1}
+proc=subprocess.Popen([str(exe),cfg['allowed_origins'][0]],stdin=subprocess.PIPE,stdout=subprocess.PIPE)
+b=json.dumps({'type':'update'}).encode()
+out,_=proc.communicate(struct.pack('<I',len(b))+b,timeout=30)
+assert proc.returncode==0 and len(out)>=4
+n=struct.unpack('<I',out[:4])[0];update_result=json.loads(out[4:4+n])
+assert update_result.get('type')=='error' and '표준 설치 위치' in update_result.get('error','')
+print('Bundled updater present; nonstandard location rejected safely PASS')
 for tool in ('node','ffmpeg'):
  subprocess.run([str(pkg/'native'/cfg[tool]),'--version' if tool=='node' else '-version'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True)
 subprocess.run([str(exe),'--yt-dlp','--version'],check=True)
