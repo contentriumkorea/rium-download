@@ -13,7 +13,7 @@ shutil.copy2(node,T/('node.exe' if os.name=='nt' else 'node'))
 cmd=[sys.executable,'-m','PyInstaller','--noconfirm','--clean','--onedir','--name','rium-download-host','--distpath',str(ROOT/'build/native'),'--workpath',str(ROOT/'build/work'),'--specpath',str(ROOT/'build'),'--collect-all','yt_dlp','--collect-all','yt_dlp_ejs',str(ROOT/'native/host.py')]
 subprocess.run(cmd,check=True)
 shutil.copytree(ROOT/'build/native/rium-download-host',N,dirs_exist_ok=True)
-m=json.loads((OUT/'extension/manifest.json').read_text());import base64,hashlib
+m=json.loads((OUT/'extension/manifest.json').read_text('utf-8-sig'));import base64,hashlib
 ident=''.join(chr(97+int(c,16)) for c in hashlib.sha256(base64.b64decode(m['key'])).hexdigest()[:32])
 cfg={'ffmpeg':'tools/'+('ffmpeg.exe' if os.name=='nt' else 'ffmpeg'),'node':'tools/'+('node.exe' if os.name=='nt' else 'node'),'allowed_origins':['chrome-extension://'+ident+'/']}
 (N/'config.json').write_text(json.dumps(cfg,indent=2),'utf-8')

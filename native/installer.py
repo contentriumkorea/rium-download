@@ -11,6 +11,8 @@ import webbrowser
 NAME = 'com.contentrium.rium_download'
 
 def install(source, destination=None, register=True, open_guide=True):
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
     source = Path(source).resolve()
     manifest = json.loads((source / 'extension/manifest.json').read_text('utf-8-sig'))
     version = manifest['version']

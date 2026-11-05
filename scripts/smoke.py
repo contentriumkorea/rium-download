@@ -2,7 +2,7 @@ import json,struct,subprocess,sys
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
 pkg=next(p for p in (root/'dist').iterdir() if p.is_dir())
-cfg=json.loads((pkg/'native/config.json').read_text())
+cfg=json.loads((pkg/'native/config.json').read_text('utf-8-sig'))
 exe=pkg/'native'/('rium-download-host.exe' if sys.platform=='win32' else 'rium-download-host')
 proc=subprocess.Popen([str(exe),cfg['allowed_origins'][0]],stdin=subprocess.PIPE,stdout=subprocess.PIPE)
 b=json.dumps({'type':'ping'}).encode()
