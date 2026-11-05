@@ -1,0 +1,83 @@
+{
+  "manifest_version": 3,
+  "name": "Rium Download",
+  "version": "2.8.0",
+  "description": "영상·음원을 원본 품질로 다운로드하고 키보드 단축키로 플레이어를 조작합니다.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "offscreen",
+    "nativeMessaging"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "action": {
+    "default_title": "Rium Download",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://redko5.com/*"
+      ],
+      "js": [
+        "shortcuts.js",
+        "download-widget.js",
+        "player-download.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://redko5.com/*"
+      ],
+      "js": [
+        "media-watch.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    }
+  ],
+  "host_permissions": [
+    "https://redko5.com/*",
+    "https://*.cdninstagram.com/*",
+    "https://*.fbcdn.net/*",
+    "https://api.github.com/*"
+  ],
+  "optional_permissions": [
+    "downloads"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "player-menu.html"
+      ],
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; base-uri 'none'"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkpqKUNu6+gQ+UKbiNGPaaqsuVZ+8hpwQwCduY/hevbqs6u0dcb1KPTvqZez440uc5OJfjN8zE634OFFeCnCix9UxqW9wSuB1PgoR/zK99dwA8Sx7CDP1TG1SbfxYT/isEG0Efo0/lrtIL2QgMxuuCCztknRDw13VV+5Jg9902qmcXR8TarAJys5PFOYEmXLSnhQZ6IyPkOpXwAlRPBnk94GBvtUtPw5ftaLGrC/ENWpXx/mCy7MERLwmpWCG9c3Ztm0XrupeKzTg/mAk1eFP8TBnTo+vEKe/CqjMEM1rTkb98M8Q4GRxdFuGb0/6lgAa8tAeEXMSFs4rWvM82hfsRQIDAQAB"
+}
