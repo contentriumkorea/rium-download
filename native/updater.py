@@ -212,10 +212,25 @@ def apply_package(root, package, expected_origin, version):
 
 def update(base, origin):
     root = install_root(base)
-    version, asset = release_asset()
-    stage = root/'updates'/uuid.uuid4().hex
-    stage.mkdir(parents=True)
-    archive = stage/'package.zip'
-    download(asset, archive)
-    package = extract(archive, stage/'package')
-    return apply_package(root, package, origin, version)
+    lock = root/'update.lock'
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        raise ValueError('업데이트가 이미 진행 중이거나 이전 작업이 중단되었습니다. 설치 상태를 확인해 주세요.')
+    stage = None
+    try:
+        os.close(fd)
+        version, asset = release_asset()
+        stage = root/'updates'/uuid.uuid4().hex
+        stage.mkdir(parents=True)
+        archive = stage/'package.zip'
+        download(asset, archive)
+        package = extract(archive, stage/'package')
+        return apply_package(root, package, origin, version)
+    finally:
+        if stage is not None and stage.is_dir() and not stage.is_symlink() and stage.resolve().parent == (root/'updates').resolve():
+            try:
+                shutil.rmtree(stage)
+            except OSError:
+                pass
+        lock.unlink(missing_ok=True)

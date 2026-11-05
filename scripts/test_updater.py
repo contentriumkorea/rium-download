@@ -29,4 +29,9 @@ with tempfile.TemporaryDirectory(dir=root/'build') as tmp:
  with zipfile.ZipFile(malicious,'w') as z:z.writestr('package/../../escape','bad')
  try:u.extract(malicious,t/'unpacked');raise AssertionError('path traversal accepted')
  except ValueError:pass
- print('Updater transaction, rollback, native registration and traversal rejection PASS')
+ lock=installed/'update.lock';lock.write_text('fixture')
+ with patch.object(u,'install_root',return_value=installed),patch.object(u,'release_asset',side_effect=AssertionError('network should not run')):
+  try:u.update(t/'native',origin);raise AssertionError('concurrent update accepted')
+  except ValueError:pass
+ assert lock.read_text()=='fixture'
+ print('Updater transaction, rollback, lock, native registration and traversal rejection PASS')
