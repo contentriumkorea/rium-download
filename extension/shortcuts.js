@@ -1,9 +1,9 @@
 (() => {
   'use strict';
-  if (globalThis.__videoShortcutInstalled?.version === '2.1.0') return;
+  if (globalThis.__videoShortcutInstalled?.version === '2.1.1') return;
   try { globalThis.__videoShortcutInstalled?.dispose?.(); } catch (_) {}
   const trackedVideos = new Map();
-  const VERSION = '2.1.0';
+  const VERSION = '2.1.1';
   const site = location.protocol + '//' + location.hostname;
   const defaultSite = 'https://redko5.com';
   let enabled = false;
@@ -109,6 +109,8 @@
     if (event.key === 'Escape' && theater) { event.preventDefault(); restoreTheater(); return; }
     if (!enabled || event.defaultPrevented || event.altKey || event.metaKey || event.isComposing) return;
     const horizontal=event.key==='ArrowLeft'||event.key==='ArrowRight';
+    const youtube = location.hostname === 'youtube.com' || location.hostname.endsWith('.youtube.com');
+    if (youtube && !(horizontal && event.ctrlKey && !event.shiftKey)) return;
     if((event.ctrlKey||event.shiftKey)&&(!horizontal||(event.ctrlKey&&event.shiftKey)))return;
     const target = event.target;
     if (target instanceof Element && !(target instanceof HTMLVideoElement) && (target.isContentEditable || target.closest('input, textarea, select, button, a, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="button"]'))) return;

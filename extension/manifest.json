@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Rium Download",
-  "version": "2.8.2",
+  "version": "2.8.3",
   "description": "영상·음원을 원본 품질로 다운로드하고 키보드 단축키로 플레이어를 조작합니다.",
   "permissions": [
     "activeTab",
