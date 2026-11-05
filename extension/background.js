@@ -30,15 +30,16 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
   if (msg.type === 'applyUpdate') {
    if (sender.url !== chrome.runtime.getURL('popup.html')) throw Error('허용되지 않은 업데이트 요청입니다.');
    if (updatingExtension) throw Error('업데이트가 이미 진행 중입니다.');
-   updatingExtension=true;
+   updatingExtension=true;let applied=false;
    try {
     await queueReady;
     await withQueue(rows=>{if(rows.some(r=>!['complete','cancelled','error'].includes(r.phase)))throw Error('진행 중인 다운로드가 끝난 뒤 업데이트해 주세요.');},false);
     const result=await updateNative();
     if(result?.type!=='updated')throw Error(result?.error||'업데이트 도우미를 확인할 수 없습니다. 설치파일을 한 번 다시 실행해 주세요.');
+    applied=true;
     setTimeout(()=>chrome.runtime.reload(),100);
     return {ok:true,version:result.version};
-   } finally { updatingExtension=false; }
+   } finally { if(!applied)updatingExtension=false; }
   }
   if (updatingExtension && ['prepareDownload','startDownload'].includes(msg.type)) throw Error('업데이트가 끝난 뒤 다운로드해 주세요.');
   if(msg.type==='repairRegistrations'){if(!sender.url?.startsWith(chrome.runtime.getURL('')))throw Error('허용되지 않은 요청입니다.');await repairSiteRegistrations();return {ok:true};}
