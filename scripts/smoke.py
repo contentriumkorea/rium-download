@@ -13,3 +13,11 @@ for tool in ('node','ffmpeg'):
  subprocess.run([str(pkg/'native'/cfg[tool]),'--version' if tool=='node' else '-version'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True)
 subprocess.run([str(exe),'--yt-dlp','--version'],check=True)
 print('Packaged native host and bundled tools PASS')
+
+import importlib.util
+spec=importlib.util.spec_from_file_location("installer",root/"native/installer.py");installer=importlib.util.module_from_spec(spec);spec.loader.exec_module(installer)
+installed=installer.install(pkg,root/"build/install-smoke",register=False,open_guide=False)
+registered=json.loads(Path(installed["nativeManifest"]).read_text("utf-8"))
+assert Path(registered["path"]).is_file()
+assert registered["allowed_origins"]==cfg["allowed_origins"]
+print("Installer filesystem and registration manifest PASS")

@@ -30,7 +30,12 @@ for name in ('yt-dlp','yt-dlp-ejs','imageio-ffmpeg','pyinstaller'):
   for f in d.files or []:
    if 'license' in str(f).lower() and d.locate_file(f).is_file():shutil.copy2(d.locate_file(f),licenses/(name+'-'+Path(f).name))
  except importlib.metadata.PackageNotFoundError:pass
-(licenses/'node-license.txt').write_bytes(subprocess.check_output([str(node),'--license']))
+import urllib.request
+node_version=subprocess.check_output([str(node),'--version'],text=True).strip()
+with urllib.request.urlopen('https://raw.githubusercontent.com/nodejs/node/'+node_version+'/LICENSE',timeout=30) as response:
+ (licenses/'node-license.txt').write_bytes(response.read())
+python_license=Path(sys.base_prefix)/('LICENSE.txt' if os.name=='nt' else 'lib/python'+str(sys.version_info.major)+'.'+str(sys.version_info.minor)+'/LICENSE.txt')
+if python_license.exists():shutil.copy2(python_license,licenses/'python-license.txt')
 (licenses/'ffmpeg-build.txt').write_bytes(subprocess.check_output([str(ff),'-version'],stderr=subprocess.STDOUT))
 shutil.make_archive(str(OUT),'zip',OUT.parent,OUT.name)
 print(OUT.with_suffix('.zip'))
