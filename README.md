@@ -16,6 +16,8 @@ Chrome 계열 브라우저가 필요합니다. Safari·Firefox용 확장은 아�
 
 [![설치 패키지 다운로드](https://img.shields.io/badge/Download-Windows%20%2F%20Mac-3564d9?style=for-the-badge)](https://github.com/contentriumkorea/rium-download/releases/latest)
 
+[Windows 설치 EXE](https://github.com/contentriumkorea/rium-download/releases/latest/download/Rium-Download-Setup-Windows-x64.exe) · [Apple Silicon Mac DMG](https://github.com/contentriumkorea/rium-download/releases/latest/download/Rium-Download-Setup-macOS-AppleSilicon.dmg) · [Intel Mac DMG](https://github.com/contentriumkorea/rium-download/releases/latest/download/Rium-Download-Setup-macOS-Intel.dmg)
+
 1. Windows에서는 **Rium-Download-Setup-Windows-x64.exe**를 실행합니다. Mac에서는 해당 기종의 **Setup DMG**를 열고 **Rium Download 설치**를 실행합니다. 별도 압축 해제나 도구 설치는 필요하지 않습니다.
 2. 설치 안내가 열리면 확장 관리 페이지의 개발자 모드를 켜고, 안내된 `extension` 폴더를 **압축해제된 확장 프로그램 로드**로 추가합니다.
 3. 사용할 영상 사이트에서 Rium Download 팝업을 열고 해당 사이트를 켭니다.
