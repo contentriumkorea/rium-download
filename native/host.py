@@ -247,7 +247,7 @@ def main():
     return 0
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1] == '--install':
+    if len(sys.argv) > 1 and sys.argv[1] in ('--install', '--register-installed', '--unregister-installed'):
         import installer
         installer.main()
         sys.exit(0)

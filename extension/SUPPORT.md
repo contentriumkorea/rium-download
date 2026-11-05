@@ -1,4 +1,4 @@
-# Rium Download 2.8.1
+# Rium Download 2.8.2
 
 ## Download support
 
@@ -33,6 +33,9 @@ Local, self-generated 8-second H.264/AAC fixtures were played with real Hls.js/d
 
 Public VOD and Shorts use an on-demand native helper. Best video+audio are remuxed to MKV; best AAC is saved as M4A. No cookie extraction, live recording or DRM support. Windows and macOS packages bundle the helper and tools. Popup checks GitHub releases; upgrades remain user-initiated. No tray, service or autostart.
 
-## Instagram layout (2.8.1)
+## Instagram layout (2.8.2)
 
 Instagram download controls sit 8px outside the media at its upper-right edge, stacked vertically (video above audio). Other sites retain their existing layout. Photos still hide the audio button. Very narrow viewports with no right-side gutter have not been verified.
+
+## 설치파일
+Windows EXE / Mac Intel·Apple Silicon DMG를 제공합니다. 파일과 Chrome·Edge 도우미는 설치기가 연결하며, 비스토어 확장 추가는 브라우저별 사용자 단계가 필요합니다. Aside 자동 설치 API는 확인되지 않았습니다. 설치 중 다운로드를 실행하지 마세요.
