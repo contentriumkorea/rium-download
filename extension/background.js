@@ -13,6 +13,17 @@ const registrationsReady=repairSiteRegistrations().catch(e=>console.warn('Site r
 chrome.runtime.onStartup.addListener(()=>{repairSiteRegistrations().catch(e=>console.warn('Site registration repair:',e.message));});
 const queueReady=recoverQueue().catch(()=>{});
 let updatingExtension=false;
+function updateNative(){return new Promise((resolve,reject)=>{
+ let port,finished=false;
+ const done=(error,value)=>{if(finished)return;finished=true;clearTimeout(timer);try{port?.disconnect();}catch(_){}error?reject(error):resolve(value);};
+ const timer=setTimeout(()=>done(Error('업데이트 시간이 초과되었습니다. 설치 상태를 확인해 주세요.')),15*60*1000);
+ try{
+  port=chrome.runtime.connectNative('com.contentrium.rium_download');
+  port.onMessage.addListener(value=>done(null,value));
+  port.onDisconnect.addListener(()=>done(Error('업데이트 도우미에 연결할 수 없습니다. 최신 설치파일을 한 번 실행해 주세요.')));
+  port.postMessage({type:'update'});
+ }catch(_){done(Error('업데이트 도우미에 연결할 수 없습니다. 최신 설치파일을 한 번 실행해 주세요.'));}
+});}
 chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
  if(msg?.target!=='background')return;
  (async()=>{
@@ -23,7 +34,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
    try {
     await queueReady;
     await withQueue(rows=>{if(rows.some(r=>!['complete','cancelled','error'].includes(r.phase)))throw Error('진행 중인 다운로드가 끝난 뒤 업데이트해 주세요.');},false);
-    const result=await chrome.runtime.sendNativeMessage('com.contentrium.rium_download',{type:'update'});
+    const result=await updateNative();
     if(result?.type!=='updated')throw Error(result?.error||'업데이트 도우미를 확인할 수 없습니다. 설치파일을 한 번 다시 실행해 주세요.');
     setTimeout(()=>chrome.runtime.reload(),100);
     return {ok:true,version:result.version};
