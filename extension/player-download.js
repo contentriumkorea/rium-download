@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.7.0-player-download.1';
+  const VERSION = '2.8.0-player-download.instagram-vertical.1';
   const previous = globalThis.__videoShortcutPlayerDownload;
   if (previous?.version === VERSION) return;
   try { previous?.dispose?.(); } catch (_) {}
@@ -9,6 +9,7 @@
   const HOST_ID = 'video-shortcut-player-download';
   const DEFAULT_ORIGIN = 'https://redko5.com';
   const origin = location.origin;
+  const isInstagram = /(^|\.)instagram\.com$/.test(location.hostname);
   const runtimeOrigin = new URL(chrome.runtime.getURL('')).origin;
   const BUTTON_SIZE = 40;
   const RIGHT_OFFSET = 16;
@@ -36,6 +37,7 @@
 
   const host = document.createElement('div');
   host.id = HOST_ID;
+  if (isInstagram) host.dataset.instagram = 'true';
   host.style.cssText = [
     'position:fixed',
     'left:0',
@@ -72,6 +74,7 @@
     .button:focus-visible { outline: 2px solid #ffffff; outline-offset: 3px; }
     .button svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 3.1; stroke-linecap: round; stroke-linejoin: round; }
     .toolbar { display:flex;gap:6px;align-items:center; }
+    :host([data-instagram="true"]) .toolbar { flex-direction:column; }
     .frame {
       display: none;
       width: ${FRAME_WIDTH}px;
@@ -234,7 +237,13 @@
       left = clamp(rect.right - width, 4 * physicalUnit, innerWidth - width - 4 * physicalUnit);
       top = candidate.xModal ? clamp(Math.max(rect.top,0) + 12 * physicalUnit, 4 * physicalUnit, innerHeight - height - 4 * physicalUnit) : clamp(rect.bottom + 8 * physicalUnit,4*physicalUnit,innerHeight-height-4*physicalUnit);
       if(candidate.xModal)left=clamp(Math.min(rect.right,innerWidth) - width - 12 * physicalUnit,4 * physicalUnit,innerWidth-width-4 * physicalUnit);
-      if(/(^|\.)instagram\.com$/.test(location.hostname)&&location.pathname.startsWith('/stories/')){const outside=rect.right+8*physicalUnit;if(outside+width<=innerWidth-4*physicalUnit){left=outside;top=clamp(Math.max(rect.top,0)+32*physicalUnit,4*physicalUnit,innerHeight-height-4*physicalUnit);}else top=clamp(Math.max(rect.top,0)+88*physicalUnit,4*physicalUnit,innerHeight-height-4*physicalUnit);}
+      if (isInstagram) {
+        // Keep both controls outside the media, including feed posts, reels and stories.
+        const stackHeight = (isPhoto ? BUTTON_SIZE : BUTTON_SIZE * 2 + 6) * physicalUnit;
+        left = rect.right + 8 * physicalUnit;
+        top = clamp(Math.max(rect.top, 0), 4 * physicalUnit, innerHeight - stackHeight - 4 * physicalUnit);
+        feedback.style.top = `${isPhoto ? 44 : 90}px`;
+      }
     }
 
     host.style.left = `${Math.round(left * 100) / 100}px`;

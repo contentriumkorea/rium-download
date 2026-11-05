@@ -1,4 +1,4 @@
-# Rium Download 2.8.0
+# Rium Download 2.8.1
 
 ## Download support
 
@@ -32,3 +32,7 @@ Local, self-generated 8-second H.264/AAC fixtures were played with real Hls.js/d
 ## YouTube (2.8.0)
 
 Public VOD and Shorts use an on-demand native helper. Best video+audio are remuxed to MKV; best AAC is saved as M4A. No cookie extraction, live recording or DRM support. Windows and macOS packages bundle the helper and tools. Popup checks GitHub releases; upgrades remain user-initiated. No tray, service or autostart.
+
+## Instagram layout (2.8.1)
+
+Instagram download controls sit 8px outside the media at its upper-right edge, stacked vertically (video above audio). Other sites retain their existing layout. Photos still hide the audio button. Very narrow viewports with no right-side gutter have not been verified.
