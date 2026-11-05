@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.8.0-player-download.instagram-vertical.1';
+  const VERSION = '2.8.0-player-download.instagram-shorts-vertical.2';
   const previous = globalThis.__videoShortcutPlayerDownload;
   if (previous?.version === VERSION) return;
   try { previous?.dispose?.(); } catch (_) {}
@@ -37,7 +37,6 @@
 
   const host = document.createElement('div');
   host.id = HOST_ID;
-  if (isInstagram) host.dataset.instagram = 'true';
   host.style.cssText = [
     'position:fixed',
     'left:0',
@@ -74,7 +73,7 @@
     .button:focus-visible { outline: 2px solid #ffffff; outline-offset: 3px; }
     .button svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 3.1; stroke-linecap: round; stroke-linejoin: round; }
     .toolbar { display:flex;gap:6px;align-items:center; }
-    :host([data-instagram="true"]) .toolbar { flex-direction:column; }
+    :host([data-external-vertical="true"]) .toolbar { flex-direction:column; }
     .frame {
       display: none;
       width: ${FRAME_WIDTH}px;
@@ -217,6 +216,11 @@
     const rect = candidate.rect;
     const isPhoto=candidate.video instanceof HTMLImageElement;button.setAttribute('aria-label',isPhoto?(location.pathname.startsWith('/stories/')?'스토리 사진 다운로드':'게시물 사진 다운로드'):'영상 다운로드');
     audioButton.hidden=isPhoto;audioButton.style.display=isPhoto?'none':'';
+    // YouTube changes routes without reloading, so update the layout on every pass.
+    const isYouTubeShorts = /(^|\.)youtube\.com$/.test(location.hostname) && /^\/shorts(?:\/|$)/.test(location.pathname);
+    const externalVertical = isInstagram || isYouTubeShorts;
+    host.dataset.externalVertical = String(externalVertical);
+    feedback.style.top = externalVertical ? `${isPhoto ? 44 : 90}px` : '44px';
     const physicalUnit = 1 / zoom;
     let left;
     let top;
@@ -237,12 +241,11 @@
       left = clamp(rect.right - width, 4 * physicalUnit, innerWidth - width - 4 * physicalUnit);
       top = candidate.xModal ? clamp(Math.max(rect.top,0) + 12 * physicalUnit, 4 * physicalUnit, innerHeight - height - 4 * physicalUnit) : clamp(rect.bottom + 8 * physicalUnit,4*physicalUnit,innerHeight-height-4*physicalUnit);
       if(candidate.xModal)left=clamp(Math.min(rect.right,innerWidth) - width - 12 * physicalUnit,4 * physicalUnit,innerWidth-width-4 * physicalUnit);
-      if (isInstagram) {
-        // Keep both controls outside the media, including feed posts, reels and stories.
+      if (externalVertical) {
+        // Keep controls outside Instagram media and YouTube Shorts.
         const stackHeight = (isPhoto ? BUTTON_SIZE : BUTTON_SIZE * 2 + 6) * physicalUnit;
         left = rect.right + 8 * physicalUnit;
         top = clamp(Math.max(rect.top, 0), 4 * physicalUnit, innerHeight - stackHeight - 4 * physicalUnit);
-        feedback.style.top = `${isPhoto ? 44 : 90}px`;
       }
     }
 

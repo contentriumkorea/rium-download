@@ -1,9 +1,10 @@
 (() => {
   'use strict';
-  if (globalThis.__videoShortcutInstalled?.version === '2.1.1') return;
+  if (globalThis.__videoShortcutInstalled?.version === '2.1.2') return;
   try { globalThis.__videoShortcutInstalled?.dispose?.(); } catch (_) {}
   const trackedVideos = new Map();
-  const VERSION = '2.1.1';
+  const VERSION = '2.1.2';
+  const isMac = /mac/i.test(navigator.userAgentData?.platform || navigator.platform || '');
   const site = location.protocol + '//' + location.hostname;
   const defaultSite = 'https://redko5.com';
   let enabled = false;
@@ -107,10 +108,12 @@
     if(!chrome.runtime?.id)return;
     if (event.composedPath().some(el => (el?.id === 'video-shortcut-download-widget' || el?.id === 'video-shortcut-player-download'))) return;
     if (event.key === 'Escape' && theater) { event.preventDefault(); restoreTheater(); return; }
-    if (!enabled || event.defaultPrevented || event.altKey || event.metaKey || event.isComposing) return;
+    if (!enabled || event.defaultPrevented || event.metaKey || event.isComposing) return;
     const horizontal=event.key==='ArrowLeft'||event.key==='ArrowRight';
+    const frameStep = horizontal && !event.shiftKey && ((event.ctrlKey && !event.altKey) || (isMac && event.altKey && !event.ctrlKey));
+    if (event.altKey && !frameStep) return;
     const youtube = location.hostname === 'youtube.com' || location.hostname.endsWith('.youtube.com');
-    if (youtube && !(horizontal && event.ctrlKey && !event.shiftKey)) return;
+    if (youtube && !frameStep) return;
     if((event.ctrlKey||event.shiftKey)&&(!horizontal||(event.ctrlKey&&event.shiftKey)))return;
     const target = event.target;
     if (target instanceof Element && !(target instanceof HTMLVideoElement) && (target.isContentEditable || target.closest('input, textarea, select, button, a, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="button"]'))) return;
@@ -120,11 +123,11 @@
       event.preventDefault();event.stopImmediatePropagation();
       if(key==='t'){if(!event.repeat)toggleTheater(remote.element);return;}
       if(key==='f'){if(!event.repeat){const doc=remote.element.ownerDocument;if(doc.fullscreenElement)doc.exitFullscreen().catch(()=>{});else remote.element.requestFullscreen().catch(()=>{});}return;}
-      chrome.runtime.sendMessage({target:'background',type:'relayFrameKey',frameId:remote.info.frameId,key:event.key,code:event.code,ctrlKey:event.ctrlKey,shiftKey:event.shiftKey,repeat:event.repeat}).catch(()=>{});return;
+      chrome.runtime.sendMessage({target:'background',type:'relayFrameKey',frameId:remote.info.frameId,key:event.key,code:event.code,ctrlKey:frameStep,shiftKey:event.shiftKey,repeat:event.repeat}).catch(()=>{});return;
     }
     if(embeddedFrame&&['t','f'].includes(key)){event.preventDefault();event.stopImmediatePropagation();if(!event.repeat)chrome.runtime.sendMessage({target:'background',type:'relayParentViewKey',key}).catch(()=>{});return;}
     const seek = seconds => { const state=trackVideo(video);state.pending=0;if (Number.isFinite(video.duration)) video.currentTime = Math.max(0,Math.min(video.duration,video.currentTime+seconds)); };
-    if(horizontal&&(event.ctrlKey||event.shiftKey)){event.preventDefault();event.stopImmediatePropagation();const dir=key==='arrowleft'?-1:1;if(event.ctrlKey)stepFrame(video,dir);else seek(dir*30);return;}
+    if(frameStep||(horizontal&&event.shiftKey)){event.preventDefault();event.stopImmediatePropagation();const dir=key==='arrowleft'?-1:1;if(frameStep)stepFrame(video,dir);else seek(dir*30);return;}
     if (key === 't' && (location.hostname === 'youtube.com' || location.hostname.endsWith('.youtube.com'))) return;
     const actions = {
       ' ': () => { if (!event.repeat) video.paused ? video.play().catch(() => {}) : video.pause(); },

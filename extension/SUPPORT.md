@@ -1,4 +1,4 @@
-# Rium Download 2.8.3
+# Rium Download 2.8.4
 
 ## Download support
 
@@ -33,7 +33,7 @@ Local, self-generated 8-second H.264/AAC fixtures were played with real Hls.js/d
 
 Public VOD and Shorts use an on-demand native helper. Best video+audio are remuxed to MKV; best AAC is saved as M4A. No cookie extraction, live recording or DRM support. Windows and macOS packages bundle the helper and tools. Popup checks GitHub releases; upgrades remain user-initiated. No tray, service or autostart.
 
-## Instagram layout (2.8.3)
+## Instagram layout (2.8.4)
 
 Instagram download controls sit 8px outside the media at its upper-right edge, stacked vertically (video above audio). Other sites retain their existing layout. Photos still hide the audio button. Very narrow viewports with no right-side gutter have not been verified.
 
@@ -41,4 +41,7 @@ Instagram download controls sit 8px outside the media at its upper-right edge, s
 Windows EXE / Mac Intel·Apple Silicon DMG를 제공합니다. 파일과 Chrome·Edge 도우미는 설치기가 연결하며, 비스토어 확장 추가는 브라우저별 사용자 단계가 필요합니다. Aside 자동 설치 API는 확인되지 않았습니다. 설치 중 다운로드를 실행하지 마세요.
 
 ## 유튜브 단축키
-유튜브에서는 확장의 Ctrl + 좌우 방향키 프레임 이동만 사용합니다. 나머지 키는 유튜브가 처리합니다. 다른 사이트의 확장 단축키는 그대로 유지합니다.
+유튜브에서는 확장의 프레임 이동만 사용합니다. Windows는 Ctrl + 좌우 방향키, Mac은 Option + 좌우 방향키를 사용할 수 있습니다. 나머지 키는 유튜브가 처리합니다. 다른 사이트의 확장 단축키는 그대로 유지합니다.
+
+## 직접 업데이트
+새 버전이 표시되면 지금 업데이트를 눌러 최신 확장과 도우미를 내려받고 적용합니다. 시작하기 전에 모든 브라우저의 Rium Download 작업을 완료하세요. 2.8.3 이하에서 처음 전환할 때와 표준 설치가 아닌 경우에는 설치파일을 한 번 다시 실행해야 합니다. 설치본과 다른 확장 ID의 설정을 자동 이전하지 않습니다.

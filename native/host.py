@@ -224,6 +224,15 @@ def main():
             if msg.get('type') == 'ping':
                 tools_config()
                 send({'type': 'pong', 'version': 1})
+            elif msg.get('type') == 'update' and WORKER is None:
+                try:
+                    import updater
+                    version = updater.update(BASE, sys.argv[1])
+                    send({'type': 'updated', 'version': version})
+                except Exception as error:
+                    message = str(error) if isinstance(error, ValueError) else '업데이트에 실패했습니다. 설치파일로 다시 시도해 주세요.'
+                    send({'type': 'error', 'error': message[:250]})
+                break
             elif msg.get('type') == 'download' and WORKER is None:
                 validate(msg)
                 WORKER = threading.Thread(target=download, args=(msg,))

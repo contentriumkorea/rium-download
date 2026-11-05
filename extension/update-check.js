@@ -6,12 +6,12 @@
   globalThis.riumVersion={compare,valid};
   if(typeof document==='undefined'||location.pathname.endsWith('/player-menu.html'))return;
   const box=document.createElement('section');box.className='update-status';box.setAttribute('aria-live','polite');
-  const label=document.createElement('span'),link=document.createElement('a'),button=document.createElement('button');
+  const label=document.createElement('span'),link=document.createElement('a'),button=document.createElement('button'),apply=document.createElement('button');
   label.textContent='Rium Download '+chrome.runtime.getManifest().version;
-  link.textContent='업데이트 다운로드';link.href='https://github.com/'+REPO+'/releases/latest';link.target='_blank';link.rel='noopener noreferrer';link.hidden=true;
-  button.type='button';button.textContent='업데이트 확인';
-  box.append(label,link,button);document.querySelector('main').append(box);
-  function show(data){if(data&&valid(data.version)&&compare(data.version,chrome.runtime.getManifest().version)>0){label.textContent='새 버전 '+data.version+'을 사용할 수 있습니다.';link.hidden=false;return true;}link.hidden=true;return false;}
+  link.textContent='설치파일로 업데이트';link.href='https://github.com/'+REPO+'/releases/latest';link.target='_blank';link.rel='noopener noreferrer';link.hidden=true;
+  button.type='button';button.textContent='업데이트 확인';apply.type='button';apply.textContent='지금 업데이트';apply.hidden=true;
+  box.append(label,apply,link,button);document.querySelector('main').append(box);
+  function show(data){if(data&&valid(data.version)&&compare(data.version,chrome.runtime.getManifest().version)>0){label.textContent='새 버전 '+data.version+'을 사용할 수 있습니다. 다른 브라우저의 다운로드도 완료한 뒤 업데이트하세요.';apply.hidden=false;link.hidden=true;return true;}apply.hidden=true;link.hidden=true;return false;}
   async function check(force=false){
     button.disabled=true;
     try{
@@ -25,5 +25,6 @@
     }catch(_){label.textContent='업데이트를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.';}
     finally{button.disabled=false;}
   }
+  apply.addEventListener('click',async()=>{apply.disabled=true;button.disabled=true;label.textContent='업데이트를 내려받고 검증하고 있습니다. 잠시 기다려 주세요.';try{const result=await chrome.runtime.sendMessage({target:'background',type:'applyUpdate'});if(!result?.ok)throw Error(result?.error||'업데이트에 실패했습니다.');label.textContent='업데이트 완료. 확장을 다시 불러옵니다.';chrome.runtime.reload();}catch(error){label.textContent=String(error?.message||'업데이트에 실패했습니다. 설치파일로 다시 시도해 주세요.');link.hidden=false;apply.disabled=false;button.disabled=false;}});
   button.addEventListener('click',()=>check(true));check();
 })();

@@ -27,6 +27,8 @@ jobs:
         with:
           node-version: '24'
       - run: node scripts/test-shortcuts.cjs
+      - run: node scripts/test-update-ui.cjs
+      - run: python scripts/test_updater.py
       - run: python -m pip install "yt-dlp[default]==2026.6.9" "pyinstaller==6.16.0" "imageio-ffmpeg==0.6.0"
       - run: python scripts/package.py
         env:
