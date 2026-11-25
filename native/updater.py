@@ -45,8 +45,17 @@ def identifier(manifest):
     return ''.join(chr(97 + int(c, 16)) for c in hashlib.sha256(key).hexdigest()[:32])
 
 
+def windows_x64():
+    # Browser-launched native hosts can receive an environment without
+    # PROCESSOR_ARCHITECTURE, which platform.machine() relies on in Python.
+    import ctypes
+    info = ctypes.create_string_buffer(64)
+    ctypes.windll.kernel32.GetNativeSystemInfo(ctypes.byref(info))
+    return ctypes.c_ushort.from_buffer(info).value == 9  # PROCESSOR_ARCHITECTURE_AMD64
+
+
 def release_asset():
-    if sys.platform == 'win32' and platform.machine().lower() in ('amd64', 'x86_64'):
+    if sys.platform == 'win32' and windows_x64():
         name = 'Rium-Download-Windows-x64.zip'
     elif sys.platform == 'darwin' and platform.machine().lower() in ('arm64', 'aarch64'):
         name = 'Rium-Download-macOS-AppleSilicon.zip'

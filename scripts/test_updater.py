@@ -3,6 +3,10 @@ import importlib.util,json,sys,tempfile,zipfile
 from unittest.mock import patch
 root=Path(__file__).resolve().parents[1];(root/'build').mkdir(exist_ok=True)
 spec=importlib.util.spec_from_file_location('updater',root/'native/updater.py');u=importlib.util.module_from_spec(spec);spec.loader.exec_module(u)
+if sys.platform == 'win32':
+ # Simulate the stripped environment used by some browser native hosts.
+ with patch.dict(u.os.environ, {}, clear=True), patch.object(u.platform, 'machine', return_value=''):
+  assert u.windows_x64(), 'Windows native architecture detection failed without environment variables'
 with tempfile.TemporaryDirectory(dir=root/'build') as tmp:
  t=Path(tmp); installed=t/'installed';(installed/'extension').mkdir(parents=True)
  manifest=json.loads((root/'extension/manifest.json').read_text('utf-8-sig'));manifest['version']='2.8.3';origin='chrome-extension://'+u.identifier(manifest)+'/'
