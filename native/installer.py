@@ -34,6 +34,10 @@ def install(source, destination=None, register=True, open_guide=True, in_place=F
         shutil.copytree(extension, destination / 'backups' / stamp / 'extension')
     if not in_place:
         shutil.copytree(source / 'extension', extension, dirs_exist_ok=True)
+        if (source / 'skills').is_dir():
+            shutil.copytree(source / 'skills', destination / 'skills', dirs_exist_ok=True)
+        if (source / 'MCP.md').is_file():
+            shutil.copy2(source / 'MCP.md', destination / 'MCP.md')
     cfg = json.loads((release / 'native/config.json').read_text('utf-8-sig'))
     host = release / 'native' / ('rium-download-host.exe' if sys.platform == 'win32' else 'rium-download-host')
     if not host.is_file():
@@ -68,7 +72,8 @@ def install(source, destination=None, register=True, open_guide=True, in_place=F
 <li>아래 폴더를 선택하세요.</li></ol><code>''' + html.escape(str(extension)) + '''</code>
 <p>Aside: 설정에서 확장 프로그램 관리 화면을 열고 같은 폴더를 추가하세요. Aside의 외부 자동 설치 API와 Mac 도우미 연결은 확인되지 않았습니다.</p>
 <p>기존 설치를 업데이트했다면 확장 관리 페이지에서 Rium Download의 새로고침 버튼을 누르세요. 진행 중 다운로드가 끝난 뒤 업데이트하세요.</p>
-<p>영상 사이트에서 확장 버튼을 눌러 해당 사이트를 켜면 영상·음원 버튼이 나타납니다.</p>''','utf-8')
+<p>HTTP(S) 웹사이트에서 확장이 기본 활성화됩니다. 페이지 버튼 표시 설정은 다운로드 기능과 별개입니다.</p>
+<p>AI 연결과 CLI·스킬 사용법은 설치 폴더의 MCP.md를 확인하세요.</p>''','utf-8')
     if open_guide:
         webbrowser.open(guide.as_uri())
     print('도우미 설치 완료 / 브라우저 확장 추가 필요: ' + str(extension))

@@ -24,6 +24,9 @@ if sys.platform == 'win32':
     manifest = target / 'native' / (NAME + '.json')
     registration = json.loads(manifest.read_text('utf-8'))
     assert Path(registration['path']).is_file()
+    assert (target / 'skills/rium-download/SKILL.md').is_file()
+    assert (target / 'MCP.md').is_file()
+    subprocess.run([registration['path'], '--cli', '--help'], stdout=subprocess.DEVNULL, check=True, timeout=30)
     for vendor in ('Google\\Chrome', 'Microsoft\\Edge', 'Chromium'):
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Software\\' + vendor + '\\NativeMessagingHosts\\' + NAME) as key:
             assert Path(winreg.QueryValueEx(key, '')[0]) == manifest
@@ -86,10 +89,13 @@ elif sys.platform == 'darwin':
         subprocess.run([str(host), '--install', '--no-guide'], env=env, check=True, timeout=180)
         target = fake_home / 'Library/Application Support/Rium Download'
         assert (target / 'extension/manifest.json').is_file()
+        assert (target / 'skills/rium-download/SKILL.md').is_file()
+        assert (target / 'MCP.md').is_file()
         for vendor in ('Google/Chrome', 'Microsoft Edge'):
             path = fake_home / 'Library/Application Support' / vendor / 'NativeMessagingHosts' / (NAME + '.json')
             cfg = json.loads(path.read_text('utf-8'))
             assert Path(cfg['path']).is_file()
+            subprocess.run([cfg['path'], '--cli', '--help'], stdout=subprocess.DEVNULL, check=True, timeout=30)
         print('Mac DMG integrity, app signature, packaged installation and registrations PASS (GUI untested)')
     finally:
         subprocess.run(['hdiutil', 'detach', str(mount)], check=True)

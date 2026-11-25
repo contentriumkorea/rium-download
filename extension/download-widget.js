@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.9.0';
+  const VERSION = '2.0.0';
   const previous = globalThis.__videoShortcutWidget;
   if (previous && typeof previous.dispose === 'function') {
     try { previous.dispose(); } catch (_) {}
@@ -60,6 +60,7 @@
   document.documentElement.append(host);
 
   let zoom = 1, collapsed = false, closed = false, storageReady = false, gotInitial = false;
+  let connectionTimer = null;
   let jobs = [];
   const dismissed = new Set();
   const text = value => value == null ? '' : String(value);
@@ -103,7 +104,8 @@
   };
   const render = () => {
     if (disposed || !storageReady) return;
-    const visible = shown(); list.replaceChildren();
+    // Reverse a copy for display only; the worker keeps FIFO scheduling.
+    const visible = shown().reverse(); list.replaceChildren();
     if (visible.length) visible.forEach(job => list.append(jobView(job)));
     else list.append(el('div', 'empty', jobs.length ? '닫은 다운로드 항목입니다.' : '다운로드 대기열이 비어 있습니다.'));
     const active = visible.filter(job => ['preparing','queued','running','cancelling'].includes(phaseOf(job.phase))).length;
@@ -142,7 +144,9 @@
     if (!ext?.runtime?.sendMessage) return;
     try { ext.runtime.sendMessage({ target:'background', type:'getDownloadState' }, response => { if (disposed || ext.runtime.lastError || !response) return; receive(Array.isArray(response.states) ? response.states : response.state, response.zoom); }); } catch (_) {}
   };
-  const dispose = () => { if (disposed) return; disposed = true; removeEventListener('resize', onResize); ext?.runtime?.onMessage?.removeListener(onMessage); host.remove(); if (globalThis.__videoShortcutWidget?.dispose === dispose) delete globalThis.__videoShortcutWidget; };
+  const dispose = () => { if (disposed) return; disposed = true; clearInterval(connectionTimer); removeEventListener('resize', onResize); try { ext?.runtime?.onMessage?.removeListener(onMessage); } catch (_) {} host.remove(); if (globalThis.__videoShortcutWidget?.dispose === dispose) delete globalThis.__videoShortcutWidget; };
   globalThis.__videoShortcutWidget = { version:VERSION, dispose };
+  // A browser extension reload invalidates old content scripts while leaving their DOM behind.
+  connectionTimer = setInterval(() => { try { if (ext && !ext.runtime?.id) dispose(); } catch (_) { dispose(); } }, 2000);
   restore(); initial();
 })();

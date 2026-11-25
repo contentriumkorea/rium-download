@@ -1,9 +1,9 @@
 (() => {
   'use strict';
-  if (globalThis.__videoShortcutInstalled?.version === '2.1.2') return;
+  if (globalThis.__videoShortcutInstalled?.version === '2.10.0') return;
   try { globalThis.__videoShortcutInstalled?.dispose?.(); } catch (_) {}
   const trackedVideos = new Map();
-  const VERSION = '2.1.2';
+  const VERSION = '2.10.0';
   const isMac = /mac/i.test(navigator.userAgentData?.platform || navigator.platform || '');
   const site = location.protocol + '//' + location.hostname;
   const defaultSite = 'https://redko5.com';
@@ -31,7 +31,7 @@
     for (const [k,v] of Object.entries({position:'fixed',top:'0',left:'0',width:'100vw',height:'85vh','max-width':'none','max-height':'none','z-index':'2147483646',margin:'0','aspect-ratio':'auto',background:'#000'})) p(box,k,v);
     if(box!==video)for(const [k,v] of Object.entries({width:'100%',height:'100%','max-width':'none','max-height':'none','object-fit':'contain'}))p(video,k,v);
   }
-  const update = async sites => { if(embeddedFrame){try{enabled=!!(await chrome.runtime.sendMessage({target:'background',type:'getFrameContext'}))?.enabled;}catch(_){enabled=false;}}else enabled = Object.prototype.hasOwnProperty.call(sites || {}, site) ? !!sites[site] : site === defaultSite; if (!enabled) { for(const state of trackedVideos.values())state.pending=0;restoreTheater(); }else{mainVideo();refreshRemote();} };
+  const update = async sites => { if(embeddedFrame){try{enabled=!!(await chrome.runtime.sendMessage({target:'background',type:'getFrameContext'}))?.enabled;}catch(_){enabled=false;}}else enabled = ['http:','https:'].includes(location.protocol); if (!enabled) { for(const state of trackedVideos.values())state.pending=0;restoreTheater(); }else{mainVideo();refreshRemote();} };
   chrome.storage.local.get('sites').then(x => update(x.sites)).catch(() => {});
   const onSiteChange=(changes, area) => { if (area === 'local' && changes.sites) update(changes.sites.newValue); };
   chrome.storage.onChanged.addListener(onSiteChange);

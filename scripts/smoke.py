@@ -16,6 +16,12 @@ assert proc.returncode==0 and len(out)>=4
 n=struct.unpack('<I',out[:4])[0];update_result=json.loads(out[4:4+n])
 assert update_result.get('type')=='error' and '표준 설치 위치' in update_result.get('error','')
 print('Bundled updater present; nonstandard location rejected safely PASS')
+mcp=subprocess.run([str(exe),'--mcp',str(root/'build/missing-mcp.json')],input=json.dumps({'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2025-11-25'}})+'\n',capture_output=True,text=True,encoding='utf-8',timeout=30,check=True)
+assert json.loads(mcp.stdout)['result']['capabilities']=={'tools':{}}
+print('Bundled MCP stdio initialization PASS')
+cli=subprocess.run([str(exe),'--cli','--help'],capture_output=True,text=True,encoding='utf-8',timeout=30,check=True)
+assert 'inspect' in cli.stdout and (pkg/'skills/rium-download/SKILL.md').is_file()
+print('Bundled CLI entry point and skill included PASS')
 for tool in ('node','ffmpeg'):
  subprocess.run([str(pkg/'native'/cfg[tool]),'--version' if tool=='node' else '-version'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True)
 subprocess.run([str(exe),'--yt-dlp','--version'],check=True)

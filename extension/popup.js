@@ -3,23 +3,16 @@ const button=document.getElementById('siteButton'), host=document.getElementById
 const defaultSite='https://redko5.com';
 const inPlayerMenu=location.pathname.endsWith('/player-menu.html');
 const quickMode=inPlayerMenu&&location.hash.includes('&quick');
-const outputMode=inPlayerMenu&&/(?:^#|&)audio(?:&|$)/.test(location.hash)?'audio':'video';
+const inspectionId=inPlayerMenu?location.hash.match(/&inspect=([a-f0-9-]{36})(?:&|$)/)?.[1]:null;
+let outputMode=inPlayerMenu&&/(?:^#|&)audio(?:&|$)/.test(location.hash)?'audio':inPlayerMenu&&/(?:^#|&)photo(?:&|$)/.test(location.hash)?'photo':'video';
+const autoSaveId=inPlayerMenu?location.hash.match(/&autoSave=([a-f0-9-]{36})(?:&|$)/)?.[1]:null;
 const prepareId=location.hash.match(/&prepare=([a-f0-9-]{36})(?:&|$)/)?.[1]||null;
-const quickError=text=>{if(quickMode){if(prepareId)chrome.runtime.sendMessage({target:'background',type:'preparationFailed',id:prepareId,error:text}).catch(()=>{});parent.postMessage({source:'videoShortcutMenu',type:'quickError',text},'*');}};
+const quickError=text=>{if(inspectionId)chrome.runtime.sendMessage({target:'background',type:'mcpInspectionResult',id:inspectionId,error:text}).catch(()=>{});if(quickMode){if(prepareId)chrome.runtime.sendMessage({target:'background',type:'preparationFailed',id:prepareId,error:text}).catch(()=>{});parent.postMessage({source:'videoShortcutMenu',type:'quickError',text},'*');}};
 let tab, site, pattern, current=false;
 let selectedMediaFrameId=Number(location.hash.match(/(?:^#|&)frame=(\d+)/)?.[1]||0);
-const setUI=(on,note)=>{current=on;button.disabled=false;document.getElementById('scan').disabled=!on;if(!on){document.getElementById('quality').disabled=true;document.getElementById('downloadButton').disabled=true;}button.setAttribute('aria-pressed',String(on));badge.textContent=on?'켜짐':'꺼짐';badge.classList.toggle('on',on);message.textContent=note || '';};
-const scriptId=()=> 'site_'+btoa(site).replace(/[^a-zA-Z0-9]/g,'_');
-(async()=>{try{if(inPlayerMenu && /^#\d+(?:&frame=\d+)?(?:&video=[a-f0-9-]{36})?(?:&prepare=[a-f0-9-]{36})?(?:&audio)?(?:&quick)?$/.test(location.hash))tab=await chrome.tabs.get(Number(location.hash.slice(1).split('&')[0]));else [tab]=await chrome.tabs.query({active:true,lastFocusedWindow:true});if(!tab || !tab.url)throw new Error('사이트 주소를 확인할 수 없습니다. 사이트를 연 뒤 확장 버튼을 눌러 주세요.');const url=new URL(tab.url);if(!['http:','https:'].includes(url.protocol))throw new Error('일반 웹사이트에서만 사용할 수 있습니다.');site=url.origin;pattern=site+'/*';host.textContent=url.hostname;const {sites={}}=await chrome.storage.local.get('sites');let on=Object.prototype.hasOwnProperty.call(sites,site)?!!sites[site]:site===defaultSite;if(on && site!==defaultSite)on=await chrome.permissions.contains({origins:[pattern]});setUI(on);if(on && inPlayerMenu)document.getElementById('scan').click();else if(quickMode&&!on)quickError('이 사이트에서 확장 프로그램을 먼저 켜 주세요.');}catch(e){host.textContent='사용할 수 없는 페이지';badge.textContent='사용 불가';message.textContent=e.message;quickError(e.message);}})();
-button.addEventListener('click',async()=>{if(!tab || !site)return;const turnOn=!current;button.disabled=true;try{
-  if(turnOn && site!==defaultSite){const granted=await chrome.permissions.request({origins:[pattern]});if(!granted){setUI(false,'사이트 접근 권한을 허용해야 사용할 수 있습니다.');return;}const existing=await chrome.scripting.getRegisteredContentScripts({ids:[scriptId()]});if(!existing.length)await chrome.scripting.registerContentScripts([{id:scriptId(),matches:[pattern],js:['x-support.js','instagram-support.js','shortcuts.js','download-widget.js','player-download.js'],runAt:'document_start',persistAcrossSessions:true}]);const watchers=await chrome.scripting.getRegisteredContentScripts({ids:[scriptId()+'_watch']});if(!watchers.length)await chrome.scripting.registerContentScripts([{id:scriptId()+'_watch',matches:[pattern],js:['media-watch.js'],world:'MAIN',runAt:'document_start',persistAcrossSessions:true}]);}
-  if(!turnOn && site!==defaultSite){const existing=await chrome.scripting.getRegisteredContentScripts({ids:[scriptId()]});if(existing.length)await chrome.scripting.unregisterContentScripts({ids:[scriptId()]});const w=await chrome.scripting.getRegisteredContentScripts({ids:[scriptId()+'_watch']});if(w.length)await chrome.scripting.unregisterContentScripts({ids:[scriptId()+'_watch']});}
-  const {sites={}}=await chrome.storage.local.get('sites');sites[site]=turnOn;await chrome.storage.local.set({sites});
-  let note;
-  if(turnOn){try{await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',files:['media-watch.js']});await chrome.scripting.executeScript({target:{tabId:tab.id},files:['x-support.js','instagram-support.js','shortcuts.js','download-widget.js','player-download.js']});}catch(_){note='설정했습니다. 페이지를 새로고침하면 적용됩니다.';}}
-  if(turnOn){await chrome.runtime.sendMessage({target:'background',type:'repairRegistrations'});try{await chrome.scripting.executeScript({target:{tabId:tab.id,allFrames:true},files:['generic-frame.js']});}catch(_){}}
-  setUI(turnOn,note);
-}catch(e){setUI(current,'설정을 변경하지 못했습니다: '+e.message);}});
+const setUI=(visible,note)=>{current=true;button.disabled=false;document.getElementById('scan').disabled=false;button.setAttribute('aria-pressed',String(visible));badge.textContent=visible?'표시':'숨김';badge.classList.toggle('on',visible);message.textContent=note || '';};
+(async()=>{try{if(inPlayerMenu && /^#\d+(?:&frame=\d+)?(?:&video=[a-f0-9-]{36})?(?:&prepare=[a-f0-9-]{36})?(?:&audio|&photo)?(?:&autoSave=[a-f0-9-]{36})?(?:&quick|&inspect=[a-f0-9-]{36})?$/.test(location.hash))tab=await chrome.tabs.get(Number(location.hash.slice(1).split('&')[0]));else [tab]=await chrome.tabs.query({active:true,lastFocusedWindow:true});if(!tab || !tab.url)throw new Error('사이트 주소를 확인할 수 없습니다. 사이트를 연 뒤 확장 버튼을 눌러 주세요.');if(autoSaveId){const auth=await chrome.runtime.sendMessage({target:'background',type:'mcpAuthorizeSave',id:autoSaveId,prepareId,tabId:tab.id});if(!auth?.ok)throw Error('자동 저장 요청을 확인할 수 없습니다.');}const url=new URL(tab.url);if(!['http:','https:'].includes(url.protocol))throw new Error('일반 웹사이트에서만 사용할 수 있습니다.');site=url.origin;pattern=site+'/*';host.textContent=url.hostname;const {sites={}}=await chrome.storage.local.get('sites');setUI(sites[site]!==false);if(inPlayerMenu)document.getElementById('scan').click();}catch(e){host.textContent='사용할 수 없는 페이지';badge.textContent='사용 불가';message.textContent=e.message;quickError(e.message);}})();
+button.addEventListener('click',async()=>{if(!tab || !site)return;button.disabled=true;try{const {sites={}}=await chrome.storage.local.get('sites');sites[site]=sites[site]===false;await chrome.storage.local.set({sites});setUI(sites[site]);try{await chrome.scripting.executeScript({target:{tabId:tab.id},files:['x-support.js','instagram-support.js','shortcuts.js','download-widget.js','player-download.js']});}catch(_){message.textContent='설정했습니다. 페이지를 새로고침하면 표시 설정이 적용됩니다.';}}catch(e){message.textContent='표시 설정을 변경하지 못했습니다: '+e.message;button.disabled=false;}});
 
 const scan=document.getElementById('scan'), quality=document.getElementById('quality'), down=document.getElementById('downloadButton'), downMsg=document.getElementById('downloadMessage'), saveMode=document.getElementById('saveMode');
 let candidates=[];
@@ -67,15 +60,33 @@ async function collectGeneric(target){
  await chrome.scripting.executeScript({target,world:'MAIN',files:['media-watch.js','adaptive-manifest.js','media-collect.js']});
  const result=await chrome.scripting.executeScript({target,world:'MAIN',func:token=>globalThis.videoShortcutMedia.collect(token),args:[xVideoToken]});return result[0]?.result||{items:[],reason:'영상을 확인하지 못했습니다.'};
 }
-scan.addEventListener('click',async()=>{
+function collectPagePhotos(token){
+ const items=[],seen=new Set();
+ for(const img of document.querySelectorAll('img')){
+  if(token&&img.getAttribute('data-vs-x-target')!==token)continue;
+  const box=img.getBoundingClientRect();if(!img.isConnected||!img.complete||img.naturalWidth<100||img.naturalHeight<100||box.width<60||box.height<60||box.right<=0||box.bottom<=0||box.left>=innerWidth||box.top>=innerHeight)continue;
+  let hidden=false;for(let p=img;p;p=p.parentElement){const s=getComputedStyle(p);if(p.hidden||p.getAttribute('aria-hidden')==='true'||s.display==='none'||s.visibility==='hidden'||Number(s.opacity)===0){hidden=true;break;}}if(hidden)continue;
+  let u;try{u=new URL(img.currentSrc||img.src,document.baseURI)}catch(_){continue}if(!['http:','https:'].includes(u.protocol)||u.username||u.password||seen.has(u.href))continue;seen.add(u.href);
+  const format=(u.searchParams.get('format')||u.pathname.match(/\.(jpe?g|png|webp|gif|avif|bmp)$/i)?.[1]||'').toLowerCase();
+  const ext=/^(jpe?g|png|webp|gif|avif|bmp)$/.test(format)?(format==='jpeg'?'jpg':format):'';
+  items.push({url:u.href,kind:'direct',mediaType:'image',photoScope:'generic',...(ext?{filename:`Rium_Image_${items.length+1}.${ext}`}:{}) ,label:`사진 ${items.length+1} · ${img.naturalWidth}×${img.naturalHeight}`,width:img.naturalWidth,height:img.naturalHeight});
+  if(items.length>=100)break;
+ }
+ return {items,hasVideo:false,reason:items.length?'':'현재 화면에서 저장 가능한 사진을 찾지 못했습니다.'};
+}
+document.getElementById('scanPhotos')?.addEventListener('click',()=>{outputMode='photo';scan.click();});
+scan.addEventListener('click',async(event)=>{
+ if(!inPlayerMenu&&event.isTrusted)outputMode='video';
  if(!current||!tab)return;scan.disabled=true;quality.disabled=true;down.disabled=true;candidates=[];frameAccess.hidden=true;downMsg.textContent='영상 파일과 스트림을 확인 중입니다...';
  try{
   let mediaTarget=selectedMediaFrameId?{tabId:tab.id,frameIds:[selectedMediaFrameId]}:{tabId:tab.id};
   const isX=['https://x.com','https://twitter.com','https://www.instagram.com','https://instagram.com'].includes(site);let data;
-  if(['https://www.youtube.com','https://youtube.com','https://m.youtube.com'].includes(site)){await chrome.scripting.executeScript({target:mediaTarget,world:'MAIN',files:['youtube-support.js']});const found=await chrome.scripting.executeScript({target:mediaTarget,world:'MAIN',func:token=>globalThis.riumYouTube.collect(token),args:[xVideoToken]});data=found[0]?.result||{items:[],reason:'유튜브 영상을 확인하지 못했습니다.'};}
+  if(outputMode==='photo'&&['https://www.instagram.com','https://instagram.com'].includes(site)){await chrome.scripting.executeScript({target:mediaTarget,world:'MAIN',files:['instagram-support.js']});const found=await chrome.scripting.executeScript({target:mediaTarget,world:'MAIN',func:token=>globalThis.__videoShortcutX.collect(token),args:[xVideoToken]});const result=found[0]?.result;data={items:(result?.items||[]).filter(x=>x.mediaType==='image'),hasVideo:false,reason:result?.reason||'현재 선택된 게시물에 사진이 없습니다.'};}
+  else if(outputMode==='photo'){const result=await chrome.scripting.executeScript({target:mediaTarget,func:collectPagePhotos,args:[xVideoToken]});data=result[0]?.result||{items:[],reason:'사진을 확인하지 못했습니다.'};}
+  else if(['https://www.youtube.com','https://youtube.com','https://m.youtube.com'].includes(site)){await chrome.scripting.executeScript({target:mediaTarget,world:'MAIN',files:['youtube-support.js']});const found=await chrome.scripting.executeScript({target:mediaTarget,world:'MAIN',func:token=>globalThis.riumYouTube.collect(token),args:[xVideoToken]});data=found[0]?.result||{items:[],reason:'유튜브 영상을 확인하지 못했습니다.'};}
   else if(isX){await chrome.scripting.executeScript({target:mediaTarget,world:'MAIN',files:['x-support.js','instagram-support.js']});const direct=await chrome.scripting.executeScript({target:mediaTarget,world:'MAIN',func:token=>globalThis.__videoShortcutX.collect(token),args:[xVideoToken]});data=direct[0]?.result||{items:[],reason:'영상을 확인할 수 없습니다.'};}
   else data=await collectGeneric(mediaTarget);
-  if(data.hasVideo===false&&!data.items?.length&&!selectedMediaFrameId){
+  if(outputMode!=='photo'&&data.hasVideo===false&&!data.items?.length&&!selectedMediaFrameId){
    try{await chrome.scripting.executeScript({target:{tabId:tab.id,allFrames:true},files:['generic-frame.js']});}catch(_){}
    const frames=await chrome.runtime.sendMessage({target:'background',type:'getFramePlayers',tabId:tab.id,purpose:'download'});const main=frames?.players?.[0];
    if(main){selectedMediaFrameId=main.frameId;mediaTarget={tabId:tab.id,frameIds:[main.frameId]};data=await collectGeneric(mediaTarget);}
@@ -86,13 +97,13 @@ scan.addEventListener('click',async()=>{
   if(!candidates.length){const o=document.createElement('option');o.textContent='사용 가능한 파일 없음';quality.append(o);downMsg.textContent=data.reason||'지원되는 영상 소스를 찾지 못했습니다. 재생 후 다시 확인해 주세요.';quickError(downMsg.textContent);if(!isX)await offerFrameAccess();}
   else{candidates.forEach((x,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=x.label+(candidates.length>1?' · 파일 '+(i+1):'');quality.append(o);});quality.disabled=false;down.disabled=false;downMsg.textContent='';}
  }catch(e){downMsg.textContent='영상을 확인하지 못했습니다: '+e.message;quickError(downMsg.textContent);}
- finally{scan.disabled=!current;if(quickMode&&candidates.length)down.click();}
+ finally{scan.disabled=!current;if(inspectionId&&candidates.length)chrome.runtime.sendMessage({target:'background',type:'mcpInspectionResult',id:inspectionId,items:candidates}).catch(()=>{});else if(quickMode&&candidates.length)down.click();}
 });
 down.addEventListener('click',async(event)=>{const c=candidates[Number(quality.value)];if(!c)return;down.disabled=true;try{
  const requested={permissions:['downloads']};if(c.kind==='youtube-native')requested.permissions.push('nativeMessaging');if(c.kind!=='youtube-native'&&(outputMode==='audio'||['hls','instagram-dash','adaptive'].includes(c.kind))){const u=new URL(c.url);requested.origins=c.origins||[u.protocol+'//'+u.hostname+'/*'];}
  const alreadyAllowed=await chrome.permissions.contains(requested);if(quickMode&&!alreadyAllowed&&!event?.isTrusted){document.body.classList.add('needs-permission');down.textContent='권한 허용 후 다운로드';downMsg.textContent='처음 한 번 다운로드·영상 서버 권한이 필요합니다.';if(prepareId)chrome.runtime.sendMessage({target:'background',type:'preparationWaiting',id:prepareId}).catch(()=>{});parent.postMessage({source:'videoShortcutMenu',type:'permissionNeeded'},'*');return;}const allowed=alreadyAllowed||await chrome.permissions.request(requested);if(!allowed){downMsg.textContent='다운로드와 영상 서버 접근 권한이 필요합니다.';quickError(downMsg.textContent);return;}
  await chrome.scripting.executeScript({target:{tabId:tab.id},files:['download-widget.js']});
- const result=await chrome.runtime.sendMessage({target:'background',type:'startDownload',prepareId,job:{outputMode,url:c.url,kind:c.kind||'direct',tabId:tab.id,title:c.title||tab.title||'video',filename:c.filename,mediaType:c.mediaType,photoScope:c.photoScope,plan:c.plan,audioUrl:c.audioUrl,expectedDuration:c.expectedDuration,saveAs:saveMode.value==='ask'}});if(!result?.ok)throw new Error(result?.error||'다운로드를 시작하지 못했습니다.');downMsg.textContent='다운로드 대기열에 추가했습니다.';if(inPlayerMenu)parent.postMessage({source:'videoShortcutMenu',type:'downloadStarted'},'*');
+ const result=await chrome.runtime.sendMessage({target:'background',type:'startDownload',prepareId,job:{outputMode,url:c.url,kind:c.kind||'direct',tabId:tab.id,frameId:selectedMediaFrameId,title:c.title||tab.title||'video',filename:c.filename,mediaType:c.mediaType,photoScope:c.photoScope,plan:c.plan,audioUrl:c.audioUrl,expectedDuration:c.expectedDuration,saveAs:!autoSaveId&&saveMode.value==='ask'}});if(!result?.ok)throw new Error(result?.error||'다운로드를 시작하지 못했습니다.');downMsg.textContent='다운로드 대기열에 추가했습니다.';if(inPlayerMenu)parent.postMessage({source:'videoShortcutMenu',type:'downloadStarted'},'*');
  }catch(e){downMsg.textContent='다운로드를 시작하지 못했습니다: '+e.message;quickError(downMsg.textContent);}finally{down.disabled=!current||!candidates.length;}});
 
 if(inPlayerMenu){const close=document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label','다운로드 메뉴 닫기');close.style.cssText='margin-left:auto;background:transparent;border:0;color:#e7e7e7;font-size:24px;cursor:pointer;padding:4px 8px';const dismiss=()=>parent.postMessage({source:'videoShortcutMenu',type:'closeMenu'},'*');close.addEventListener('click',dismiss);document.querySelector('header').append(close);addEventListener('keydown',e=>{if(e.key==='Escape')dismiss();});}

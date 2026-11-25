@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.8.0-player-download.instagram-shorts-vertical.2';
+  const VERSION = '2.10.1-player-download';
   const previous = globalThis.__videoShortcutPlayerDownload;
   if (previous?.version === VERSION) return;
   try { previous?.dispose?.(); } catch (_) {}
@@ -126,7 +126,7 @@
   const setEnabled = (sites) => {
     enabled = Object.prototype.hasOwnProperty.call(sites || {}, origin)
       ? Boolean(sites[origin])
-      : origin === DEFAULT_ORIGIN;
+      : true;
     if (!enabled) {
       restoreXSpacing();
       menuOpen = false;
@@ -157,8 +157,8 @@
   };
 
   const mainVideo = () => {
-    if(globalThis.__videoShortcutX){const api=globalThis.__videoShortcutX;const video=(api.mainDownloadTarget||api.mainVideo)();if(!video)return null;const box=video.closest('[data-testid="videoPlayer"]')||video;return {video,rect:box.getBoundingClientRect(),box,xModal:!!video.closest('[role="dialog"]')||!!document.fullscreenElement||/(^|\.)instagram\.com$/.test(location.hostname)};}
-    const candidates = [];
+    if(globalThis.__videoShortcutX){const api=globalThis.__videoShortcutX;const video=(api.mainDownloadTarget||api.mainVideo)();if(video){const box=video.closest('[data-testid="videoPlayer"]')||video;return {video,rect:box.getBoundingClientRect(),box,xModal:!!video.closest('[role="dialog"]')||!!document.fullscreenElement||/(^|\.)instagram\.com$/.test(location.hostname)};}}
+    const candidates = [],photos=[];
     const walk=(root,dx=0,dy=0,clip={left:0,top:0,right:innerWidth,bottom:innerHeight},depth=0)=>{
       if(depth>8)return;
       for(const el of root.querySelectorAll('*')){
@@ -166,12 +166,18 @@
         if(el.tagName==='IFRAME'){
           try{const r=el.getBoundingClientRect(),d=el.contentDocument,s=el.ownerDocument.defaultView.getComputedStyle(el);if(d&&r.width>=160&&r.height>=90&&s.display!=='none'&&s.visibility!=='hidden')walk(d,dx+r.left+el.clientLeft,dy+r.top+el.clientTop,{left:Math.max(clip.left,dx+r.left),top:Math.max(clip.top,dy+r.top),right:Math.min(clip.right,dx+r.right),bottom:Math.min(clip.bottom,dy+r.bottom)},depth+1);}catch(_){}
         }
-        if(el.tagName!=='VIDEO'||!el.isConnected)continue;
+        if(!['VIDEO','IMG'].includes(el.tagName)||!el.isConnected)continue;
+        if(el.tagName==='IMG'){
+          // The photo collector uses document.querySelectorAll; never offer a target it cannot resolve.
+          if(el.getRootNode()!==document)continue;
+          if(!el.complete||el.naturalWidth<200||el.naturalHeight<200)continue;
+          try{if(!['http:','https:'].includes(new URL(el.currentSrc||el.src).protocol))continue;}catch(_){continue;}
+        }
         const r=el.getBoundingClientRect(),s=el.ownerDocument.defaultView.getComputedStyle(el);
-        if(r.width<160||r.height<90||s.display==='none'||s.visibility==='hidden'||Number(s.opacity)===0)continue;
+        if(r.width<160||r.height<(el.tagName==='IMG'?160:90)||s.display==='none'||s.visibility==='hidden'||Number(s.opacity)===0)continue;
         const rect={left:Math.max(clip.left,dx+r.left),top:Math.max(clip.top,dy+r.top),right:Math.min(clip.right,dx+r.right),bottom:Math.min(clip.bottom,dy+r.bottom)};rect.width=rect.right-rect.left;rect.height=rect.bottom-rect.top;
         if(rect.width<=0||rect.height<=0)continue;
-        candidates.push({video:el,rect,area:rect.width*rect.height,ad:looksLikeAd(el)});
+        (el.tagName==='IMG'?photos:candidates).push({video:el,rect,area:rect.width*rect.height,ad:looksLikeAd(el)});
       }
     };walk(document);
     const nonAds = candidates.filter(candidate => !candidate.ad);
@@ -180,7 +186,8 @@
     if(pool.length)return pool[0];
     const remote=[];
     for(const frame of document.querySelectorAll('iframe')){const info=remotePlayers.find(p=>p.url===frame.src);if(!info)continue;const rect=frame.getBoundingClientRect();if(rect.width>=160&&rect.height>=90&&rectVisibleArea(rect)>0)remote.push({video:frame,rect,area:rectVisibleArea(rect),frameId:info.frameId});}
-    remote.sort((a,b)=>b.area-a.area);return remote[0]||null;
+    remote.sort((a,b)=>b.area-a.area);if(remote.length)return remote[0];
+    return photos.filter(photo=>!photo.ad).sort((a,b)=>b.area-a.area)[0]||null;
   };
 
   const clamp = (value, minimum, maximum) => {
@@ -214,7 +221,8 @@
     selectedFrameId=candidate.frameId||0;
     restoreXSpacing();
     const rect = candidate.rect;
-    const isPhoto=candidate.video instanceof HTMLImageElement;button.setAttribute('aria-label',isPhoto?(location.pathname.startsWith('/stories/')?'스토리 사진 다운로드':'게시물 사진 다운로드'):'영상 다운로드');
+    const isPhoto=candidate.video?.tagName==='IMG';button.setAttribute('aria-label',isPhoto?'사진 다운로드':'영상 다운로드');
+    if(button.dataset.mediaKind!==(isPhoto?'photo':'video')){button.dataset.mediaKind=isPhoto?'photo':'video';button.innerHTML=isPhoto?'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 2-2 5 4"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="13" height="14" rx="2"/><path d="m16 10 5-3v10l-5-3z"/></svg>';}
     audioButton.hidden=isPhoto;audioButton.style.display=isPhoto?'none':'';
     // YouTube changes routes without reloading, so update the layout on every pass.
     const isYouTubeShorts = /(^|\.)youtube\.com$/.test(location.hostname) && /^\/shorts(?:\/|$)/.test(location.pathname);
@@ -267,7 +275,7 @@
         if (response && Number.isInteger(response.tabId)) tabId = response.tabId;
         if (openAfterRefresh) {
           if (!Number.isInteger(tabId)) return;
-          frame.src = chrome.runtime.getURL('player-menu.html') + '?request=' + encodeURIComponent(prepareId || crypto.randomUUID()) + '#' + tabId + (selectedFrameId?'&frame='+selectedFrameId:'') + (selectedVideoToken?'&video='+selectedVideoToken:'') + (prepareId?'&prepare='+prepareId:'') + (outputMode==='audio'?'&audio':'') + '&quick';
+          frame.src = chrome.runtime.getURL('player-menu.html') + '?request=' + encodeURIComponent(prepareId || crypto.randomUUID()) + '#' + tabId + (selectedFrameId?'&frame='+selectedFrameId:'') + (selectedVideoToken?'&video='+selectedVideoToken:'') + (prepareId?'&prepare='+prepareId:'') + (outputMode==='audio'?'&audio':outputMode==='photo'?'&photo':'') + '&quick';
           menuOpen = true;button.disabled=true;audioButton.disabled=true;button.title=outputMode==='audio'?'음원 확인 중...':'최고 화질 영상 확인 중...';audioButton.title='음원 확인 중...';
           host.dataset.menuOpen = 'true';
         }
@@ -281,11 +289,12 @@
     event.preventDefault();event.stopPropagation();
     if(menuOpen||!downloadButtonVisible)return;
     outputMode=mode;feedback.textContent='';
-    const x=globalThis.__videoShortcutX;if(x){const v=(x.mainDownloadTarget||x.mainVideo)();if(!v)return;selectedVideoToken=crypto.randomUUID();v.setAttribute('data-vs-x-target',selectedVideoToken);if(/(^|\.)instagram\.com$/.test(location.hostname)){v.setAttribute('data-vs-ig-source',v.currentSrc||v.src||'');v.setAttribute('data-vs-ig-page',location.pathname);v.setAttribute('data-vs-ig-story-id',location.pathname.match(/^\/stories\/[^/]+\/(\d+)/)?.[1]||'');}}else {const selected=mainVideo()?.video;selectedVideoToken=selected?.tagName==='VIDEO'?crypto.randomUUID():null;if(selectedVideoToken)selected.setAttribute('data-vs-x-target',selectedVideoToken);}
+    const selected=mainVideo()?.video;if(!selected)return;selectedVideoToken=['VIDEO','IMG'].includes(selected.tagName)?crypto.randomUUID():null;
+    if(selectedVideoToken){selected.setAttribute('data-vs-x-target',selectedVideoToken);if(isInstagram){selected.setAttribute('data-vs-ig-source',selected.currentSrc||selected.src||'');selected.setAttribute('data-vs-ig-page',location.pathname);selected.setAttribute('data-vs-ig-story-id',location.pathname.match(/^\/stories\/[^/]+\/(\d+)/)?.[1]||'');}}
     button.disabled=true;audioButton.disabled=true;button.title='화질 확인 중...';
     try{const created=await chrome.runtime.sendMessage({target:'background',type:'prepareDownload',outputMode});if(!created?.ok)throw Error(created?.error||'다운로드를 준비하지 못했습니다.');prepareId=created.id;refreshState(true);}catch(e){feedback.textContent=e.message;button.disabled=false;audioButton.disabled=false;}
   };
-  button.addEventListener('click',e=>requestDownload(e,'video'));
+  button.addEventListener('click',e=>requestDownload(e,mainVideo()?.video?.tagName==='IMG'&&!isInstagram?'photo':'video'));
   audioButton.addEventListener('click',e=>requestDownload(e,'audio'));
 
   const onRuntimeMessage = (message) => {

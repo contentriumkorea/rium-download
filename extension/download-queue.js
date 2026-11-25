@@ -32,7 +32,18 @@ async function enqueueDownload(job,prepareId){
   if(tracks.length===1&&tracks[0].type==='audio'||tracks.length===2&&(tracks.filter(t=>t.type==='video').length!==1||tracks.filter(t=>t.type==='audio').length!==1))throw Error('영상·음성 트랙 연결을 확인하지 못했습니다.');
   if(!await chrome.permissions.contains({origins:allowedOrigins.map(o=>o+'/*')}))throw Error('영상 서버 접근 권한이 없습니다.');adaptivePlan={version:1,duration:p.duration,tracks};
  }
- const image=job.mediaType==='image',photoScope=job.photoScope||'story';if(image){const tab=await chrome.tabs.get(job.tabId);const pageUrl=new URL(tab.url||'');const file=/^Instagram_(story|post)_\d+\.(jpg|jpeg|png|webp)$/.exec(job.filename||'');if(kind!=='direct'||pageUrl.protocol!=='https:'||!['www.instagram.com','instagram.com'].includes(pageUrl.hostname)||!['story','post'].includes(photoScope)||(photoScope==='story'?!pageUrl.pathname.startsWith('/stories/'):pageUrl.pathname.startsWith('/stories/'))||u.protocol!=='https:'||u.port||u.hash||!/(^|\.)(cdninstagram\.com|fbcdn\.net)$/.test(u.hostname)||!(/\.(jpe?g|png|webp)$/i.test(u.pathname))||!file||file[1]!==photoScope)throw Error('Instagram 사진과 다운로드 주소를 안전하게 확인하지 못했습니다.');}
+ const image=job.mediaType==='image',photoScope=job.photoScope||'story';if(image){
+  const tab=await chrome.tabs.get(job.tabId),pageUrl=new URL(tab.url||'');
+  if(kind!=='direct'||!['http:','https:'].includes(pageUrl.protocol))throw Error('사진 페이지를 확인하지 못했습니다.');
+  if(photoScope==='generic'){
+   if(!Number.isInteger(job.frameId)||job.frameId<0)throw Error('사진 프레임 정보가 잘못되었습니다.');
+   if(job.filename&&!/^Rium_Image_\d+\.(?:jpg|png|webp|gif|avif|bmp)$/i.test(job.filename))throw Error('사진 파일명이 잘못되었습니다.');
+   const match=await chrome.scripting.executeScript({target:{tabId:job.tabId,frameIds:[job.frameId]},func:raw=>[...document.querySelectorAll('img')].some(img=>{try{return img.isConnected&&img.complete&&new URL(img.currentSrc||img.src,document.baseURI).href===raw}catch(_){return false}}),args:[u.href]});
+   if(!match[0]?.result)throw Error('선택한 사진이 페이지에서 변경되었습니다. 다시 확인해 주세요.');
+  }else{
+   const file=/^Instagram_(story|post)_\d+\.(jpg|jpeg|png|webp)$/.exec(job.filename||'');if(pageUrl.protocol!=='https:'||!['www.instagram.com','instagram.com'].includes(pageUrl.hostname)||!['story','post'].includes(photoScope)||(photoScope==='story'?!pageUrl.pathname.startsWith('/stories/'):pageUrl.pathname.startsWith('/stories/'))||u.protocol!=='https:'||u.port||u.hash||!/(^|\.)(cdninstagram\.com|fbcdn\.net)$/.test(u.hostname)||!(/\.(jpe?g|png|webp)$/i.test(u.pathname))||!file||file[1]!==photoScope)throw Error('Instagram 사진과 다운로드 주소를 안전하게 확인하지 못했습니다.');
+  }
+ }
 
  if(kind==='instagram-dash'){
   const tab=await chrome.tabs.get(job.tabId);if(!/^https:\/\/(www\.)?instagram\.com\//.test(tab.url||''))throw Error('Instagram 영상 탭이 아닙니다.');
@@ -69,7 +80,7 @@ async function pump(){
     if((await currentRow(row.id))?.cancelRequested)await chrome.runtime.sendMessage({target:'offscreen',type:'cancelDownload',id:row.id}).catch(()=>{});
    }else{
     const u=new URL(row.job.url),opts={url:row.job.url,saveAs:row.job.saveAs,conflictAction:'uniquify'};
-    if(u.hostname==='video.twimg.com'&&/^X_\d+\.mp4$/.test(row.job.filename||'')||row.job.mediaType==='image')opts.filename=row.job.filename;
+    if(u.hostname==='video.twimg.com'&&/^X_\d+\.mp4$/.test(row.job.filename||'')||row.job.mediaType==='image'&&row.job.filename)opts.filename=row.job.filename;
     const id=await chrome.downloads.download(opts);
     const updated=await updateRow(row.id,r=>{r.downloadId=id;r.status=r.cancelRequested?'취소 중':'파일 다운로드 중';r.detail='브라우저에 파일을 저장하고 있습니다.';});
     if(updated?.cancelRequested){await chrome.downloads.cancel(id).catch(()=>{});await finishJob(row.id,'cancelled','다운로드 취소됨','다운로드를 취소했습니다.');return;}

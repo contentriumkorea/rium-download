@@ -1,7 +1,7 @@
 'use strict';
 
 const PARTY_ORIGIN='https://yadongparty10.com',PLAYER_ORIGIN='https://api.ydydapi.com',SEGMENT_ORIGIN='https://res.ydydapi.com';
-async function parentEnabled(tabId){const tab=await chrome.tabs.get(tabId);let origin;try{origin=new URL(tab.url).origin;}catch(_){return false;}const sites=(await chrome.storage.local.get('sites')).sites||{};return Object.hasOwn(sites,origin)?!!sites[origin]:origin==='https://redko5.com';}
+async function parentEnabled(tabId){try{const u=new URL((await chrome.tabs.get(tabId)).url);return ['http:','https:'].includes(u.protocol);}catch(_){return false;}}
 async function frameContext(sender){if(!sender.tab?.id||!sender.frameId||!sender.url)return {enabled:false};const url=new URL(sender.url),tab=await chrome.tabs.get(sender.tab.id);const enabled=new URL(tab.url).origin===PARTY_ORIGIN&&url.origin===PLAYER_ORIGIN&&/^\/v1\/Yl\/player\/\d+/.test(url.pathname)&&await parentEnabled(sender.tab.id)&&await chrome.permissions.contains({origins:[PLAYER_ORIGIN+'/*']});return {enabled};}
 async function availableFrames(tabId,includeGeneric=false){if(!Number.isInteger(tabId)||!await parentEnabled(tabId))return [];const key='framePlayers_'+tabId,saved=(await chrome.storage.session.get(key))[key]||[];return saved.filter(f=>Date.now()-f.updatedAt<7000&&(includeGeneric||!f.generic)).sort((a,b)=>b.width*b.height-a.width*a.height);}
 
@@ -10,9 +10,11 @@ chrome.storage.session.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'}).catch(()
 async function offscreenExists(){return (await chrome.runtime.getContexts({contextTypes:['OFFSCREEN_DOCUMENT'],documentUrls:[chrome.runtime.getURL('offscreen.html')]})).length>0;}
 importScripts('youtube-native.js','download-queue.js','site-repair.js');
 const registrationsReady=repairSiteRegistrations().catch(e=>console.warn('Site registration repair:',e.message));
-chrome.runtime.onStartup.addListener(()=>{repairSiteRegistrations().catch(e=>console.warn('Site registration repair:',e.message));});
+chrome.runtime.onStartup.addListener(()=>{repairSiteRegistrations().catch(e=>console.warn('Site registration repair:',e.message));mcpConnect().catch(()=>{});});
 const queueReady=recoverQueue().catch(()=>{});
 let updatingExtension=false;
+importScripts('mcp-background.js');
+mcpConnect().catch(()=>{});
 function updateNative(){return new Promise((resolve,reject)=>{
  let port,finished=false;
  const done=(error,value)=>{if(finished)return;finished=true;clearTimeout(timer);try{port?.disconnect();}catch(_){}error?reject(error):resolve(value);};
@@ -27,9 +29,20 @@ function updateNative(){return new Promise((resolve,reject)=>{
 chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
  if(msg?.target!=='background')return;
  (async()=>{
+  if(msg.type==='mcpInspectionResult')return mcpInspectionResult(msg,sender);
+  if(msg.type==='mcpAuthorizeSave')return mcpAuthorizeSave(msg,sender);
+  if(msg.type==='mcpControl'){
+   if(sender.url!==chrome.runtime.getURL('popup.html'))throw Error('허용되지 않은 MCP 요청입니다.');
+   if(msg.action==='start'){if(updatingExtension)throw Error('업데이트 중입니다.');await mcpConnect();}
+   else if(msg.action==='stop')mcpDisconnect();
+   else if(msg.action==='cancel'){if(mcpBatch?.running){mcpBatch.cancelled=true;if(mcpBatch.activeId)await cancelQueueItem(mcpBatch.activeId);}}
+   return {ok:true,enabled:!!mcpConfig,config:mcpConfig};
+  }
   if (msg.type === 'applyUpdate') {
    if (sender.url !== chrome.runtime.getURL('popup.html')) throw Error('허용되지 않은 업데이트 요청입니다.');
    if (updatingExtension) throw Error('업데이트가 이미 진행 중입니다.');
+   if(mcpBusy||mcpBatch?.running)throw Error('MCP 일괄 작업이 끝난 뒤 업데이트해 주세요.');
+   mcpDisconnect();
    updatingExtension=true;let applied=false;
    try {
     await queueReady;
@@ -87,7 +100,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
  })().then(respond,e=>respond({ok:false,error:e.message}));return true;
 });
 chrome.downloads.onChanged.addListener(delta=>{onBrowserChanged(delta).catch(()=>{});});
-chrome.runtime.onInstalled.addListener(()=>{(async()=>{const registered=await chrome.scripting.getRegisteredContentScripts();for(const r of registered)if(r.id.startsWith('site_')&&!r.id.endsWith('_watch')){await chrome.scripting.updateContentScripts([{id:r.id,js:['x-support.js','instagram-support.js','shortcuts.js','download-widget.js','player-download.js']}]);if(!registered.some(w=>w.id===r.id+'_watch'))await chrome.scripting.registerContentScripts([{id:r.id+'_watch',matches:r.matches,js:['media-watch.js'],world:'MAIN',runAt:'document_start',persistAcrossSessions:true}]);}await queueReady;await registrationsReady;await repairSiteRegistrations();})().catch(e=>console.warn(e.message));});
+chrome.runtime.onInstalled.addListener(()=>{Promise.all([queueReady,registrationsReady]).then(()=>repairSiteRegistrations()).catch(e=>console.warn(e.message));});
 
 chrome.tabs.onZoomChange.addListener(info=>{chrome.tabs.sendMessage(info.tabId,{type:'pageZoom',zoom:info.newZoomFactor}).catch(()=>{});});
 

@@ -43,12 +43,12 @@ def read_exact(stream, n):
         out.extend(part)
     return bytes(out)
 
-def receive(stream):
+def receive(stream, max_size=16384):
     header = read_exact(stream, 4)
     if header is None:
         return None
     size = struct.unpack('<I', header)[0]
-    if not 0 < size <= 16384:
+    if not 0 < size <= max_size:
         raise ValueError('message size')
     data = read_exact(stream, size)
     if data is None:
@@ -209,6 +209,7 @@ def download(msg):
 
 def main():
     global WORKER
+    bridge = None
     allowed = tools_config().get('allowed_origins', [ORIGIN])
     if len(sys.argv) < 2 or sys.argv[1] not in allowed:
         return 2
@@ -218,13 +219,22 @@ def main():
         msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
     try:
         while True:
-            msg = receive(sys.stdin.buffer)
+            msg = receive(sys.stdin.buffer, 1048576 if bridge else 16384)
             if msg is None:
                 break
             if msg.get('type') == 'ping':
                 tools_config()
                 send({'type': 'pong', 'version': 1})
-            elif msg.get('type') == 'update' and WORKER is None:
+            elif msg.get('type') == 'mcpBridge' and WORKER is None and bridge is None:
+                import mcp_bridge
+                bridge = mcp_bridge.Bridge(BASE, sys.argv[1], send)
+                command = sys.executable
+                args = (['--mcp', str(bridge.path)] if getattr(sys, 'frozen', False)
+                        else [str(BASE / 'host.py'), '--mcp', str(bridge.path)])
+                send({'type': 'mcpReady', 'config': {'command': command, 'args': args}})
+            elif msg.get('type') == 'mcpResponse' and bridge is not None:
+                bridge.reply(msg)
+            elif msg.get('type') == 'update' and WORKER is None and bridge is None:
                 try:
                     import updater
                     version = updater.update(BASE, sys.argv[1])
@@ -233,7 +243,7 @@ def main():
                     message = str(error) if isinstance(error, ValueError) else '업데이트에 실패했습니다. 설치파일로 다시 시도해 주세요.'
                     send({'type': 'error', 'error': message[:250]})
                 break
-            elif msg.get('type') == 'download' and WORKER is None:
+            elif msg.get('type') == 'download' and WORKER is None and bridge is None:
                 validate(msg)
                 WORKER = threading.Thread(target=download, args=(msg,))
                 WORKER.start()
@@ -245,6 +255,8 @@ def main():
     except Exception:
         send({'type': 'error', 'error': '도우미 요청이 올바르지 않거나 필요한 도구를 찾지 못했습니다.'})
     finally:
+        if bridge:
+            bridge.close()
         terminate()
         if WORKER:
             WORKER.join(timeout=20)
@@ -256,6 +268,29 @@ def main():
     return 0
 
 if __name__ == '__main__':
+    if len(sys.argv) > 1 and sys.argv[1] == '--cli':
+        if not getattr(sys, 'frozen', False):
+            skill_root = ROOT / 'skills' if (ROOT / 'skills').is_dir() else ROOT / 'release' / 'skills'
+            sys.path.insert(0, str(skill_root / 'rium-download' / 'scripts'))
+        import rium_download
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8')
+        sys.exit(rium_download.main(sys.argv[2:]))
+    if len(sys.argv) == 5 and sys.argv[1] == '--mcp-call':
+        import mcp_bridge
+        try:
+            arguments = json.loads(sys.argv[4])
+            if not isinstance(arguments, dict):
+                raise ValueError()
+            result = mcp_bridge.call(sys.argv[2], {'method': 'tools/call', 'params': {'name': sys.argv[3], 'arguments': arguments}})
+        except (ValueError, TypeError):
+            result = {'ok': False, 'error': 'Invalid tool arguments'}
+        sys.stdout.buffer.write((json.dumps(result, ensure_ascii=False) + '\n').encode('utf-8'))
+        sys.exit(0 if result.get('ok') else 1)
+    if len(sys.argv) == 3 and sys.argv[1] == '--mcp':
+        import mcp_bridge
+        mcp_bridge.stdio(sys.argv[2])
+        sys.exit(0)
     if len(sys.argv) > 1 and sys.argv[1] in ('--install', '--register-installed', '--unregister-installed'):
         import installer
         installer.main()

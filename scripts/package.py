@@ -10,15 +10,16 @@ ff=Path(imageio_ffmpeg.get_ffmpeg_exe());node=Path(shutil.which('node'))
 T=N/'tools';T.mkdir(exist_ok=True)
 shutil.copy2(ff,T/('ffmpeg.exe' if os.name=='nt' else 'ffmpeg'))
 shutil.copy2(node,T/('node.exe' if os.name=='nt' else 'node'))
-cmd=[sys.executable,'-m','PyInstaller','--noconfirm','--clean','--onedir','--name','rium-download-host','--distpath',str(ROOT/'build/native'),'--workpath',str(ROOT/'build/work'),'--specpath',str(ROOT/'build'),'--collect-all','yt_dlp','--collect-all','yt_dlp_ejs',str(ROOT/'native/host.py')]
+cmd=[sys.executable,'-m','PyInstaller','--noconfirm','--clean','--onedir','--name','rium-download-host','--distpath',str(ROOT/'build/native'),'--workpath',str(ROOT/'build/work'),'--specpath',str(ROOT/'build'),'--paths',str(ROOT/'skills/rium-download/scripts'),'--collect-all','yt_dlp','--collect-all','yt_dlp_ejs',str(ROOT/'native/host.py')]
 subprocess.run(cmd,check=True)
 shutil.copytree(ROOT/'build/native/rium-download-host',N,dirs_exist_ok=True)
 m=json.loads((OUT/'extension/manifest.json').read_text('utf-8-sig'));import base64,hashlib
 ident=''.join(chr(97+int(c,16)) for c in hashlib.sha256(base64.b64decode(m['key'])).hexdigest()[:32])
 cfg={'ffmpeg':'tools/'+('ffmpeg.exe' if os.name=='nt' else 'ffmpeg'),'node':'tools/'+('node.exe' if os.name=='nt' else 'node'),'allowed_origins':['chrome-extension://'+ident+'/']}
 (N/'config.json').write_text(json.dumps(cfg,indent=2),'utf-8')
-for name in ('README.md','LICENSE','THIRD-PARTY.md'):
+for name in ('README.md','LICENSE','THIRD-PARTY.md','MCP.md'):
  shutil.copy2(ROOT/name,OUT/name)
+shutil.copytree(ROOT/'skills/rium-download',OUT/'skills/rium-download',ignore=shutil.ignore_patterns('__pycache__','*.pyc','local-settings.json'))
 for name in (('Install-Windows.cmd','Install-Windows.ps1') if os.name=='nt' else ('Install-macOS.command',)):
  shutil.copy2(ROOT/'install'/name,OUT/name)
  if os.name!='nt':(OUT/name).chmod(0o755)

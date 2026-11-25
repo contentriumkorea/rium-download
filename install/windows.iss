@@ -37,6 +37,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Source: "{#PackageDir}\native\*"; DestDir: "{app}\native"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PackageDir}\extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PackageDir}\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PackageDir}\skills\*"; DestDir: "{app}\skills"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PackageDir}\MCP.md"; DestDir: "{app}"
 Source: "{#PackageDir}\LICENSE"; DestDir: "{app}"
 Source: "{#PackageDir}\THIRD-PARTY.md"; DestDir: "{app}"
 
