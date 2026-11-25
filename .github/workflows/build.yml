@@ -34,6 +34,7 @@ jobs:
       - run: node scripts/test-youtube-mcp.cjs
       - run: node scripts/test-media-mcp.cjs
       - run: node scripts/test-inspection-mcp.cjs
+      - run: node scripts/test-bound-hls.cjs
       - run: python scripts/test_mcp.py
       - run: python scripts/test_cli.py
       - run: python scripts/test_updater.py

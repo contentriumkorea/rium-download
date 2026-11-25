@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const VERSION = '3.0.0';
+  const VERSION = '3.1.1';
   if (globalThis.videoShortcutMedia?.version === VERSION) return;
   const safe = fn => {try {return fn();} catch (_) {return undefined;}};
   const positive = value => Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : 0;
@@ -87,7 +87,7 @@
       const type=String(meta.type||''), adaptive=meta.manifest ? 'adaptive' : manifestKind(url,type);
       // Extensionless sources are permitted only when they are loaded or come from this player's API.
       if(!adaptive && !trusted && !/^video\//i.test(type) && !/\.(?:mp4|m4v|webm|ogv|ogg|mov)$/i.test(new URL(url).pathname)) return;
-      found.push({url,adaptive,height:qualityHeight(meta),bandwidth:positive(meta.bandwidth||meta.bitrate),label:typeof meta.label==='string'?meta.label:''});
+      found.push({url,adaptive,exactBinding:trusted,reactBinding:!!meta.reactBinding,height:qualityHeight(meta),bandwidth:positive(meta.bandwidth||meta.bitrate),label:typeof meta.label==='string'?meta.label:''});
     }
     add(v.currentSrc, {height:v.videoHeight}, true);
     add(v.getAttribute?.('src'));
@@ -118,6 +118,22 @@
         if(Array.isArray(src)) for(const s of src) add(s,{},true); else add(src,{},true);
       }
     }
+    // React-managed Hls.js instances may live in refs rather than on the element.
+    // Accept a component only when one of its refs is this exact video and a
+    // second ref is an Hls instance whose media is the same video.
+    const fiberKey=safe(()=>Object.getOwnPropertyNames(v).find(k=>k.startsWith('__reactFiber$')));
+    let fiber=fiberKey?safe(()=>v[fiberKey]):null;const reactSources=new Set();
+    for(let depth=0;fiber&&depth<20;depth++,fiber=safe(()=>fiber.return)){
+      let hook=safe(()=>fiber.memoizedState),hasVideoRef=false,players=[],count=0;
+      while(hook&&count++<200){
+        const ref=safe(()=>hook.memoizedState?.current);
+        if(ref===v)hasVideoRef=true;
+        if(ref&&safe(()=>ref.media)===v){const src=safe(()=>ref.url);if(typeof src==='string'&&manifestKind(src)==='hls')players.push(src);}
+        hook=safe(()=>hook.next);
+      }
+      if(hasVideoRef)for(const src of players)reactSources.add(src);
+    }
+    if(reactSources.size===1)add([...reactSources][0],{type:'application/vnd.apple.mpegurl',reactBinding:true},true);
     // JW's getter is used only on a rendered JW container, and verified against its actual container.
     for(let e=parent(v),i=0;e&&i<12;e=parent(e),i++) {
       if(!e.id || !/(?:^|\s)jwplayer(?:\s|$)/.test(String(e.className||'')) || typeof win.jwplayer!=='function') continue;
@@ -133,7 +149,7 @@
     for(const x of found) {
       const old=unique.get(x.url);
       if(!old) unique.set(x.url,x);
-      else unique.set(x.url,{...old,adaptive:old.adaptive||x.adaptive,height:old.height||x.height,bandwidth:old.bandwidth||x.bandwidth,label:old.label||x.label});
+      else unique.set(x.url,{...old,adaptive:old.adaptive||x.adaptive,exactBinding:old.exactBinding||x.exactBinding,reactBinding:old.reactBinding||x.reactBinding,height:old.height||x.height,bandwidth:old.bandwidth||x.bandwidth,label:old.label||x.label});
     }
     return [...unique.values()];
   }
@@ -151,6 +167,25 @@
     if(v.mediaKeys) return fail('DRM으로 보호된 영상은 다운로드할 수 없습니다.');
     const duration=Number(v.duration), currentSrc=v.currentSrc||'', sources=boundSources(v), items=[], errors=[];
     const inspect=globalThis.videoShortcutAdaptive?.inspect;
+    async function legacyBoundHls(source){
+      const origin=new URL(source.url).origin,res=await fetch(source.url,{credentials:'omit',redirect:'error'});
+      if(!res.ok||res.redirected||!res.body?.getReader||res.url&&new URL(res.url).href!==new URL(source.url).href)return [];
+      const size=Number(res.headers.get('content-length')||0);if(size>2000000)return [];
+      const reader=res.body.getReader(),chunks=[];let bytes=0;
+      try{for(;;){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>2000000){await reader.cancel();return [];}chunks.push(part.value);}}finally{reader.releaseLock();}
+      const joined=new Uint8Array(bytes);let offset=0;for(const chunk of chunks){joined.set(chunk,offset);offset+=chunk.length;}
+      const text=new TextDecoder('utf-8',{fatal:true}).decode(joined),lines=text.split(/\r?\n/).map(x=>x.trim());
+      if(!text.startsWith('#EXTM3U')||!lines.includes('#EXT-X-ENDLIST')||lines.some(x=>/^#EXT-X-(MAP|BYTERANGE|DISCONTINUITY|STREAM-INF|SESSION-KEY|GAP|PART|PRELOAD-HINT|SKIP|DEFINE)(:|$)/.test(x)))return [];
+      for(const line of lines.filter(x=>x.startsWith('#EXT-X-KEY:'))){
+        const method=/(?:^|,)METHOD=([^,]+)/.exec(line.slice(11))?.[1],format=/(?:^|,)KEYFORMAT=("[^"]*"|[^,]+)/.exec(line.slice(11))?.[1]?.replace(/^"|"$/g,'');
+        if(format&&format!=='identity'||!['NONE','AES-128'].includes(method))return [];
+        if(method==='AES-128'){const uri=/(?:^|,)URI="([^"]+)"/.exec(line.slice(11))?.[1],iv=/(?:^|,)IV=([^,]+)/.exec(line.slice(11))?.[1];if(!uri||iv&&!/^0x[0-9a-f]{1,32}$/i.test(iv))return [];const key=new URL(uri,source.url);if(!['http:','https:'].includes(key.protocol)||key.username||key.password||key.origin!==origin)return [];}
+      }
+      let seconds=0,count=0,pending=false;
+      for(const line of lines){if(line.startsWith('#EXTINF:')){const n=parseFloat(line.slice(8));if(pending||!Number.isFinite(n)||n<=0)return [];seconds+=n;pending=true;}else if(line&&!line.startsWith('#')){if(!pending)return [];const u=new URL(line,source.url);if(!['http:','https:'].includes(u.protocol)||u.username||u.password||u.origin!==origin)return [];pending=false;if(++count>10000)return [];}}
+      if(pending||!count||!Number.isFinite(duration)||duration<=0||Math.abs(seconds-duration)>Math.max(3,duration*.005))return [];
+      return [{url:source.url,kind:'hls',height:positive(v.videoHeight),bandwidth:source.bandwidth,label:'연결된 HLS · '+(v.videoHeight?v.videoHeight+'p':'원본')+' (.mp4)',origins:[origin+'/*']}];
+    }
     async function adaptive(source, fallback=false) {
       if(typeof inspect!=='function') {errors.push('스트리밍 목록 분석기를 사용할 수 없습니다.');return [];}
       try {
@@ -162,7 +197,7 @@
           const d=Number(c.plan.duration);
           return Number.isFinite(duration)&&duration>0&&Number.isFinite(d)&&d>0&&Math.abs(d-duration)<=Math.max(2,duration*0.02);
         }).map(c=>({...c,kind:'adaptive',label:c.label||source.label||'스트리밍 영상',height:positive(c.height||source.height),bandwidth:positive(c.bandwidth||source.bandwidth),origins:Array.isArray(c.origins)?c.origins:[],plan:c.plan}));
-      } catch(error) {errors.push(String(error?.message||'스트리밍 목록을 분석하지 못했습니다.'));return [];}
+      } catch(error) {if(!fallback&&source.exactBinding&&manifestKind(source.url)==='hls'&&String(error?.message||'')==='Adaptive manifest: encrypted HLS'){try{const legacy=await legacyBoundHls(source);if(legacy.length)return legacy;}catch(_){}}errors.push(String(error?.message||'스트리밍 목록을 분석하지 못했습니다.'));return [];}
     }
     for(const source of sources.slice(0,40)) {
       if(source.adaptive) items.push(...await adaptive(source));
@@ -187,6 +222,8 @@
     }
     // Do not return a plan for a video that changed while manifest requests were pending.
     if(!v.isConnected || v.mediaKeys || (v.currentSrc||'')!==currentSrc || (exact&&v.getAttribute('data-vs-x-target')!==String(token))) return fail('분석 중 영상이 바뀌었거나 보호된 영상으로 변경되었습니다. 다시 선택해 주세요.');
+    const reactBound=sources.filter(x=>x.reactBinding);
+    if(reactBound.length){const latest=boundSources(v).filter(x=>x.reactBinding);if(latest.length!==reactBound.length||reactBound.some(x=>!latest.some(y=>y.url===x.url)))return fail('분석 중 재생 영상이 변경되었습니다. 다시 선택해 주세요.');}
     const unique=new Map();
     for(const item of items) unique.set(item.kind+'|'+item.url+'|'+item.height+'|'+item.bandwidth,item);
     const result=[...unique.values()].sort((a,b)=>b.height-a.height||b.bandwidth-a.bandwidth);
